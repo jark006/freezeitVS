@@ -1,0 +1,28 @@
+// 提示文件帮助 Visual Studio IDE 解释 Visual C++ 标识符,
+// 如函数和宏的名称。
+// 有关详细信息，请参见 https://go.microsoft.com/fwlink/?linkid=865984
+#define START_TIME_COUNT auto start_clock = clock()
+#define START_TIME_COUNT ((void)0)
+#define END_TIME_COUNT int duration_us=clock()-start_clock;freezeit.log("%s(): %d.%03d ms", __FUNCTION__, duration_us/1000, duration_us%1000)
+#define END_TIME_COUNT int duration_ms=clock()-start_clock;freezeit.log("%s(): %d ms", __FUNCTION__, duration_ms)
+#define END_TIME_COUNT ((void)0)
+#define DT_DIR
+#define STRNCAT(buf, len, __VA_ARGS__) len += snprintf(buf + len, sizeof(buf) - len, __VA_ARGS__)
+#define stderr
+#define errno
+#define SIGKILL
+#define O_WRONLY
+#define O_TRUNC
+#define F_OK
+#define SIGSTOP
+#define SIGCONT
+#define DEBUG_DURATION
+#define IN_ALL_EVENTS (IN_ACCESS | IN_MODIFY | IN_ATTRIB | IN_CLOSE_WRITE | IN_CLOSE_NOWRITE | IN_OPEN | IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE | IN_CREATE | IN_DELETE_SELF | IN_MOVE_SELF)
+#define O_RDWR
+#define O_CLOEXEC
+#define NULL
+#define PROT_READ
+#define MAP_PRIVATE
+#define BINDER_CURRENT_PROTOCOL_VERSION
+#define BINDER_VERSION _IOWR('b', 9, struct binder_version)
+#define BINDER_FREEZE _IOW('b', 14, struct binder_freeze_info)

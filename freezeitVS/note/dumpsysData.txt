@@ -1,0 +1,46 @@
+matisse:/ $ su
+matisse:/ # dumpsys activity lru
+ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
+  Activities:
+  #115: fg     TOP  LCMN 11625:com.android.settings/1000 act:activities|recents
+  #114: vis    BTOP ---N 21898:com.xiaomi.account/u0a150 act:client
+  #113: vis+ 2 TOP  LCMN 18007:bin.mt.plus/u0a199 act:activities|recents
+  #112: vis    BFGS ---N 2510:com.miui.home/u0a81 act:activities
+  #111: vis    BFGS ---N 4133:com.miui.personalassistant/u0a67 act:client
+  #110: prev   LAST ---- 24438:com.tencent.mobileqq/u0a242 act:activities|recents
+  #109: prev   LAST ---- 20863:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a242i26 act:client
+  #108: prev   LAST ---- 23545:com.tencent.mobileqq:MSF/u0a242 act:client
+  #107: prcp   FGS  -CMN 17170:com.termux/u0a206 act:activities|recents
+  #106: cch    CAC  ---- 31828:com.android.chrome/u0a296 act:activities|recents
+  #105: cch+10 CACC ---- 14121:com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:49/u0a296i-9000 act:client
+  #104: cch    CAC  ---- 10122:com.miui.securitycenter/1000 act:activities
+  #103: fg     BTOP ---N 4143:com.miui.securitycenter.remote/1000 act:client
+  #102: home   SVC  ---- 10598:com.tencent.mm/u0a270 act:activities|recents
+  #101: cch+ 5 SVC  ---- 5962:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a270i39 act:client
+  #100: cch+ 5 SVC  ---- 19026:com.tencent.mm:push/u0a270 act:client
+  #99: cch+30 CAC  ---- 7433:com.jark006.freezeit/u0a302 act:activities|recents
+  #98: cch+40 CAC  ---- 30376:com.omarea.vtools/u0a251 act:activities|recents
+  #97: fg     SVC  ---- 17649:com.baidu.tieba/u0a245 act:activities|recents
+  #96: cch+ 5 CEM  ---- 10679:com.ruanmei.ithome/u0a255
+  #95: cch+ 5 CEM  ---- 10953:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a255i23
+  #94: cch+50 CACC ---- 31952:com.android.chrome:privileged_process0/u0a296 act:client
+  #93: cch+ 5 CEM  ---- 944:tv.danmaku.bili:download/u0a208
+  #92: vis    CEM  ---- 331:tv.danmaku.bili:ijkservice/u0a208
+  #91: cch+15 CEM  ---- 20620:com.coolapk.market:xg_vip_service/u0a236
+  #90: cch+15 CEM  ---- 26508:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0a231i30
+  #89: prcp   FGS  -CMN 22287:com.ximalaya.ting.android:player/u0a195
+  #88: vis    BTOP ---N 4281:com.miui.analytics/u0a96 act:client
+  Other:
+  #87: psvc   PER  LCMN 3690:com.android.providers.media.module/u0a189
+  #86: cch+ 5 CEM  ---- 13109:android.process.media/u0a56
+  #85: cch+25 CEM  ---- 30730:com.azure.authenticator/u0a284
+  #84: vis    BFGS ---N 4497:com.miui.powerkeeper/1000
+  #83: cch+25 CEM  ---- 25000:com.sina.weibo:remote/u0a221
+  #82: cch+25 CEM  ---- 17569:com.sina.weibo/u0a221
+  #81: cch+15 CEM  ---- 17348:gyuh.qcxkd.xpo/u0a282
+  #80: fg     FGS  ---N 3282:com.xiaomi.mirror/1000
+  #79: vis    BTOP ---N 30793:com.miui.securitycenter:ui/1000
+  #78: cch+35 CEM  ---- 8187:com.xiaomi.misettings/1000
+  #77: vis    BTOP ---N 29789:com.miui.securityadd/u0a132
+  #76: vis    IMPF ---- 2874:com.miui.aod/1000
+  #75: prcp   FGS  ---N 25735:com.miui.gallery/u0a65

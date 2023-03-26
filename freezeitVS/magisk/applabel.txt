@@ -1,0 +1,259 @@
+com.android.internal.display.cutout.emulation.corner####边角刘海屏
+com.android.internal.display.cutout.emulation.double####双刘海屏
+com.android.internal.display.cutout.emulation.hole####打孔屏
+com.android.internal.display.cutout.emulation.tall####长型刘海屏
+com.android.theme.font.notoserifsource####Noto Serif / Source Sans Pro
+com.android.internal.display.cutout.emulation.waterfall####瀑布刘海屏
+player.normal.np####NP管理器
+io.github.jark006.weather####小天气
+com.charmingglobe.charmingearth####共生地球
+cn.litiaotiao.app####李跳跳
+com.android.internal.systemui.navbar.gestural####Gestural Navigation Bar
+com.android.internal.systemui.navbar.threebutton####3 Button Navigation Bar
+com.android.internal.systemui.navbar.gestural_extra_wide_back####Gestural Navigation Bar
+com.android.internal.systemui.navbar.gestural_narrow_back####Gestural Navigation Bar
+com.android.networkstack.overlay####NetworkStackOverlay
+com.android.internal.systemui.navbar.gestural_wide_back####Gestural Navigation Bar
+me.ele####饿了么
+com.android.providers.contacts####联系人存储
+com.android.providers.calendar####日历存储
+com.android.bips####系统打印服务
+com.mediatek.callrecorder####通话录音机
+com.lbe.security.miui####权限管理服务
+com.microsoft.bing####微软必应
+com.miui.cloudbackup####小米云备份
+com.google.android.documentsui####文件
+com.android.externalstorage####外部存储设备
+com.android.mtp####MTP 主机
+com.android.incallui####电话
+com.mediatek.engineermode####EngineerMode
+com.miui.miservice####服务与反馈
+com.miui.mishare.connectivity####小米互传
+com.miui.contentextension####传送门
+com.android.calendar####日历
+com.android.contacts####通讯录与拨号
+com.miui.packageinstaller####应用包管理组件
+com.miui.gallery####相册
+com.android.mms####短信
+com.miui.personalassistant####智能助理
+com.miui.player####音乐
+com.miui.vipservice####我的服务
+com.android.quicksearchbox####搜索
+com.android.managedprovisioning####工作设置
+com.miui.video####小米视频
+com.miui.yellowpage####生活黄页
+com.mi.health####小米运动健康
+com.xiaomi.gamecenter.sdk.service####游戏服务
+com.miui.extraphoto####Bokeh
+com.android.browser####浏览器
+com.android.camera####相机
+com.android.vpndialogs####VpnDialogs
+com.miui.home####系统桌面
+ru.maximoff.apktool####Apktool M
+com.android.packageinstaller####软件包安装程序
+com.android.proxyhandler####ProxyHandler
+com.xiaomi.micloud.sdk####com.xiaomi.micloudsdk.SdkApplication
+com.android.statementservice####意图过滤器验证服务
+com.mobiletools.systemhelper####SystemHelper
+com.android.apps.tag####Tags
+com.android.traceur####系统跟踪
+com.miui.voicetrigger####语音唤醒
+com.mediatek.ygps####YGPS
+com.android.bluetoothmidiservice####Bluetooth MIDI Service
+com.android.dreams.basic####基本互动屏保
+com.miui.analytics####Analytics
+com.deepl.mobiletranslator####DeepL
+com.android.cameraextensions####CameraExtensionsProxy
+com.android.carrierdefaultapp####运营商默认应用
+com.xiaomi.cameratools####相机标定
+com.android.certinstaller####证书安装程序
+com.android.companiondevicemanager####配套设备管理器
+com.fido.asm####FIDO UAF1.0 ASM
+com.noctuasoftware.stellarium_free####Stellarium
+com.debug.loggerui####DebugLoggerUI
+com.google.android.ext.shared####Android Shared Library
+com.miui.cloudservice####小米云服务
+com.miui.hybrid.accessory####智慧生活
+com.google.android.printservice.recommendation####Print Service Recommendation Service
+com.android.htmlviewer####HTML 查看器
+com.mediatek.lbs.em2.ui####LocationEM2
+com.android.wallpaper.livepicker####Live Wallpaper Picker
+com.miui.accessibility####小米无障碍
+com.miui.hybrid####快应用服务框架
+com.miui.phrase####常用语
+com.miui.guardprovider####MIUI安全组件
+com.android.deskclock####时钟
+com.android.fileexplorer####文件管理
+com.miui.securityinputmethod####小米安全键盘
+com.miui.vpnsdkmanager####MiuiVpnSdkManager
+com.miui.greenguard####家人守护
+com.miui.miwallpaper####壁纸
+com.xiaomi.metoknlp####网络位置服务
+com.miui.systemAdSolution####智能服务
+com.mipay.wallet####钱包
+com.miui.misound####音质音效
+com.milink.service####投屏
+com.android.printspooler####打印处理服务
+com.miuix.editor####textaction
+com.miui.securityadd####系统服务组件
+com.miui.nextpay####小米智能卡网页组件
+com.xiaomi.market####应用商店
+com.mediatek.op01.telecom####OP01Telecom
+com.mediatek.op09clib.phone.plugin####OP09ClibTeleService
+com.mediatek.op09clib.telecom####OP09ClibTelecom
+com.android.pacprocessor####PacProcessor
+com.android.captiveportallogin####CaptivePortalLogin
+com.xiaomi.payment####米币支付
+com.android.simappdialog####Sim App Dialog
+com.unionpay.tsmservice.mi####银联可信服务安全组件小米版本
+com.sohu.inputmethod.sogou.xiaomi####搜狗输入法小米版
+com.miui.voiceassist####小爱语音
+com.xiaomi.xmsfkeeper####Xiaomi Service Framework Keeper
+com.xiaomi.xmsf####小米服务框架
+org.fdroid.fdroid####F-Droid
+com.xiaomi.account####小米帐号
+com.xiaomi.macro####自动连招
+com.xiaomi.simactivate.service####小米SIM卡激活服务
+com.greenpoint.android.mc10086.activity####中国移动
+com.miui.core####MIUI SDK
+com.miui.system####com.miui.internal.app.SystemApplication
+org.ifaa.aidl.manager####IFAAService
+com.google.android.networkstack.tethering.overlay####TetheringResOverlay
+com.google.android.networkstack.overlay####GoogleNetworkStackResOverlay
+com.android.networkstack.tethering.inprocess.overlay####TetheringResOverlay
+org.mipay.android.manager####MipayService
+com.android.networkstack.inprocess.overlay####NetworkStackInProcessResOverlay
+com.tencent.soter.soterserver####SoterService
+com.android.networkstack.tethering.overlay####TetheringResOverlay
+com.github.kr328.clash.foss####Clash for Android
+com.fingerprints.sensortesttool####Sensor Test Tool
+com.google.android.onetimeinitializer####Google One Time Init
+com.google.android.configupdater####ConfigUpdater
+com.android.settings.intelligence####设置建议
+com.android.vending####Google Play 商店
+com.google.android.gsf####Google 服务框架
+com.android.server.telecom.overlay.miui####通话管理
+com.android.modulemetadata####Module Metadata
+com.google.android.webview####Android System WebView
+com.google.android.marvin.talkback####Android 无障碍套件
+com.android.emergency####急救信息
+com.android.storagemanager####存储空间管理器
+com.goodix.gftest####指纹测试
+com.android.wifi.resources####系统 WLAN 资源
+com.android.hotspot2.osulogin####OsuLogin
+com.android.connectivity.resources####系统网络连接资源
+com.google.android.ext.services####Android Services Library
+com.android.permissioncontroller####权限控制器
+com.android.providers.media.module####媒体存储设备
+com.xunmeng.pinduoduo####拼多多
+com.miui.mediaeditor####小米相册-编辑
+com.miui.compass####指南针
+com.shatyuka.zhiliao####知了
+com.ximalaya.ting.android####喜马拉雅
+com.miui.calculator####计算器
+com.ss.android.ugc.aweme####抖音
+com.xiaomi.scanner####小爱视觉
+bin.mt.plus####MT管理器
+com.autonavi.minimap####高德地图
+com.github.android####GitHub
+com.GizmoVR.Virtual.Reality.Videos####GizmoVR
+com.sinovatech.unicom.ui####中国联通
+com.termux####Termux
+com.duokan.phone.remotecontroller####万能遥控
+tv.danmaku.bili####哔哩哔哩
+com.flatter.app.kuafu####蓝奏浏览器
+gm.tieba.tabswitch####贴吧TS
+com.xiaomi.mibrain.speech####系统语音引擎
+com.zhihu.android####知乎
+com.jooan.qiaoanzhilian####乔安智联
+com.eg.android.AlipayGphone####支付宝
+com.listen1.app####Listen 1
+com.miui.notes####笔记
+com.sina.weibo####微博
+com.google.android.youtube####YouTube
+com.google.earth####地球
+com.taobao.taobao####淘宝
+io.github.muntashirakon.AppManager####App Manager
+com.lemon.lv####剪映
+com.google.android.syncadapters.contacts####Google通讯录同步
+com.android.soundrecorder####录音机
+com.coolapk.market####酷安
+com.fkzhang.wechatxposed####微X模块
+io.github.qauxv####QAuxiliary
+com.v2ray.ang####v2rayNG
+com.lonelycatgames.Xplore####X-plore
+com.sohu.inputmethod.sogou####搜狗输入法
+com.tencent.mobileqq####QQ
+com.byyoung.setting####爱玩机工具箱
+com.alicloud.databox####阿里云盘
+com.baidu.netdisk####百度网盘
+com.cainiao.wireless####菜鸟
+com.jingdong.app.mall####京东
+com.sankuai.meituan####美团
+com.taou.maimai####脉脉
+com.omarea.vtools####Scene5
+com.valvesoftware.android.steam.community####Steam
+com.microsoft.office.officelens####Lens
+make.more.r2d2.cellular_z####CellularZ
+com.ruanmei.ithome####IT之家
+com.One.WoodenLetter####一个木函
+com.icbc####中国工商银行
+com.oray.sunlogin.service####向日葵客户端
+com.videogo####萤石云视频
+com.taobao.idlefish####闲鱼
+com.shixiseng.activity####实习僧
+cn.wps.moffice_eng####WPS Office
+com.apkpure.aegon####APKPure
+com.MobileTicket####铁路12306
+cn.gov.pbc.dcep####数字人民币
+com.netease.cloudmusic####网易云音乐
+github.tornaco.android.thanos####Thanox
+com.tencent.mm####微信
+com.google.samples.apps.cardboarddemo####Cardboard
+org.telegram.messenger####Telegram
+com.baidu.tieba####百度贴吧
+com.niksoftware.snapseed####Snapseed
+com.microsoft.whiteboard.publicpreview####Whiteboard
+de.schildbach.wallet####Bitcoin Wallet
+ee.dustland.android.dustlandsudoku####Sudoku
+com.microsoft.office.officehubrow####Microsoft 365 (Office)
+com.findtheway####老王VPN
+com.paprbit.dcoder####Dcoder
+gyuh.qcxkd.xpo####Set
+com.midea.ai.appliances####美的美居
+com.azure.authenticator####Authenticator
+com.mxtech.videoplayer.ad####MX 播放器
+cz.ackee.ventusky####Ventusky
+jp.pxv.android####pixiv
+com.twitter.android####Twitter
+com.flashspeed.pro####Flash VPN Pro
+air.com.eu.inove.sss2####Solar System Scope
+com.escapistgames.starchart####Star Chart
+com.miui.screenshot####截屏
+com.android.chrome####Chrome
+com.fox2code.mmm####Fox's Magisk模块管理器
+com.tencent.tmgp.pubgmhd####和平精英
+org.daai.netcheck####网络万用表
+com.sonelli.juicessh####JuiceSSH
+info.muge.appshare####App分享
+com.lt2333.simplicitytools####WooBox For MIUI
+com.digitalgd.dgyss####粤省事
+cn.toside.music.mobile####LX Music
+com.mediatek.location.mtkgeofence####Mtk Geofence
+com.android.musicfx####MusicFX
+com.android.egg####Android S Easter Egg
+com.mediatek.mdmconfig####MDMConfig
+com.mediatek.mdmlsample####MDMLSample
+com.mediatek.miravision.ui####MiraVision
+com.android.providers.downloads.ui####下载管理
+com.google.android.gms.location.history####Google 位置记录
+com.miui.carlink####CarWith
+com.miui.privacycomputing####MIUI Privacy Components
+com.miui.otaprovision####OtaProvision
+com.xiaomi.security.onetrack####SecurityOnetrackService
+com.xiaomi.aireco####XiaoaiRecommendation
+com.mediatek.duraspeed####快霸
+com.android.uwb.resources####System UWB Resources
+com.android.adservices.api####Android AdServices
+com.android.safetycenter.resources####安全中心资源
+io.github.jark006.freezeit####冻它

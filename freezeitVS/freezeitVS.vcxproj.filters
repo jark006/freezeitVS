@@ -1,0 +1,152 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{b8410e50-6694-4280-8743-961eafa0c139}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{394619e0-c382-4a1f-9415-d431855bc7cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="magisk">
+      <UniqueIdentifier>{7bc29a2c-778b-4ad1-b6f9-658ee6e8fdcc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="note">
+      <UniqueIdentifier>{1a760ced-43ba-40bd-80c9-0b28084f4b05}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="doze.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="freezeit.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="freezer.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="managedApp.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="server.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="settings.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="systemTools.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="vpopen.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+    <None Include="note.md" />
+    <None Include="build_pack.ps1" />
+    <None Include="magisk\customize.sh">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="magisk\freezeit">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="magisk\freezeit_v2.6.4.apk">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="magisk\module.prop">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="magisk\service.sh">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="magisk\system.prop">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="magisk\uninstall.sh">
+      <Filter>magisk</Filter>
+    </None>
+    <None Include="note\ico.psd">
+      <Filter>note</Filter>
+    </None>
+    <None Include="note\new_icon.psd">
+      <Filter>note</Filter>
+    </None>
+    <None Include="note\termux设置.md">
+      <Filter>note</Filter>
+    </None>
+    <None Include="note\冻它2.6.2 _冻结操作逻辑路线.xlsx">
+      <Filter>note</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="changelog.txt" />
+    <Text Include="changelogFull.txt" />
+    <Text Include="magisk\appcfg.txt">
+      <Filter>magisk</Filter>
+    </Text>
+    <Text Include="magisk\applabel.txt">
+      <Filter>magisk</Filter>
+    </Text>
+    <Text Include="magisk\changelog.txt">
+      <Filter>magisk</Filter>
+    </Text>
+    <Text Include="note\amData.txt">
+      <Filter>note</Filter>
+    </Text>
+    <Text Include="note\amHelp.txt">
+      <Filter>note</Filter>
+    </Text>
+    <Text Include="note\dumpsysData.txt">
+      <Filter>note</Filter>
+    </Text>
+    <Text Include="note\freezeit_logo_svg.txt">
+      <Filter>note</Filter>
+    </Text>
+    <Text Include="note\pmHelp.txt">
+      <Filter>note</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="note\ic_launcher_background.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_background2.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_foreground.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_foreground2.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_round.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_round2.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_square.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_square2.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_width.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\ic_launcher_width2.png">
+      <Filter>note</Filter>
+    </Image>
+    <Image Include="note\冻它冻结说明.png">
+      <Filter>note</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

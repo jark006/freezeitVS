@@ -1,0 +1,20 @@
+RootTask id=7 bounds=[0,1641][1440,3200] displayId=0 userId=0
+ configuration={1.0 460mcc2mnc [zh_CN] ldltr sw411dp w411dp h429dp 560dpi smll widecg port night ?pc finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 1641 - 1440, 3200) mAppBounds=Rect(0, 1641 - 1440, 3144) mMaxBounds=Rect(0, 0 - 1440, 3200) mWindowingMode=split-screen-secondary mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.73 fontWeightAdjustment=0 themeChanged=0 themeChangedFlags=0 extraData = Bundle[{}] dt/?}
+  taskId=3: unknown bounds=[0,1641][1440,3200] userId=0 visible=true topActivity=ComponentInfo{com.ruanmei.ithome/com.ruanmei.ithome.ui.NewsInfoActivity}
+  taskId=8595: com.tencent.mm/com.tencent.mm.ui.LauncherUI bounds=[0,1641][1440,3200] userId=0 visible=true topActivity=ComponentInfo{com.ruanmei.ithome/com.ruanmei.ithome.ui.NewsInfoActivity}
+  taskId=8648: com.android.settings/com.android.settings.MainSettings bounds=[0,1641][1440,3200] userId=0 visible=true topActivity=ComponentInfo{com.ruanmei.ithome/com.ruanmei.ithome.ui.NewsInfoActivity}
+  taskId=2: com.miui.home/com.miui.home.launcher.Launcher bounds=[0,348][1440,3200] userId=0 visible=true topActivity=ComponentInfo{com.ruanmei.ithome/com.ruanmei.ithome.ui.NewsInfoActivity}
+  taskId=8655: com.ruanmei.ithome/com.ruanmei.ithome.ui.MainActivity bounds=[0,1641][1440,3200] userId=0 visible=true topActivity=ComponentInfo{com.ruanmei.ithome/com.ruanmei.ithome.ui.NewsInfoActivity}
+
+RootTask id=6 bounds=[0,0][1440,1607] displayId=0 userId=0
+ configuration={1.0 460mcc2mnc [zh_CN] ldltr sw411dp w411dp h429dp 560dpi smll widecg port night ?pc finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1440, 1607) mAppBounds=Rect(0, 104 - 1440, 1607) mMaxBounds=Rect(0, 0 - 1440, 3200) mWindowingMode=split-screen-primary mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.73 fontWeightAdjustment=0 themeChanged=0 themeChangedFlags=0 extraData = Bundle[{}] dt/?}
+  taskId=8656: com.baidu.tieba/com.baidu.tieba.LogoActivity bounds=[0,0][1440,1607] userId=0 visible=true topActivity=ComponentInfo{com.baidu.tieba/com.baidu.tieba.tblauncher.MainTabActivity}
+
+RootTask id=4 bounds=[0,0][1440,3200] displayId=0 userId=0
+ configuration={1.0 460mcc2mnc [zh_CN] ldltr sw411dp w411dp h868dp 560dpi nrml long widecg port night ?pc finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1440, 3200) mAppBounds=Rect(0, 104 - 1440, 3144) mMaxBounds=Rect(0, 0 - 1440, 3200) mWindowingMode=multi-window mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.73 fontWeightAdjustment=0 themeChanged=0 themeChangedFlags=0 extraData = Bundle[{}] dt/?}
+  taskId=4: unknown bounds=[0,0][1440,3200] userId=0 visible=false
+
+RootTask id=5 bounds=[0,0][1440,3200] displayId=0 userId=0
+ configuration={1.0 460mcc2mnc [zh_CN] ldltr sw411dp w411dp h868dp 560dpi nrml long widecg port night ?pc finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1440, 3200) mAppBounds=Rect(0, 104 - 1440, 3144) mMaxBounds=Rect(0, 0 - 1440, 3200) mWindowingMode=multi-window mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.73 fontWeightAdjustment=0 themeChanged=0 themeChangedFlags=0 extraData = Bundle[{}] dt/?}
+  taskId=5: unknown bounds=[0,0][1440,3200] userId=0 visible=false
+

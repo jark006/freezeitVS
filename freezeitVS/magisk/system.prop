@@ -1,0 +1,12 @@
+# 禁用 Millet
+persist.sys.gz.enable=false
+persist.sys.millet.handshake=false
+persist.sys.powmillet.enable=false
+persist.sys.brightmillet.enable=false
+
+# 缓解杀后台 (源自酷安 @moonheart)
+persist.sys.mms.compact_enable=true
+persist.sys.mms.bg_apps_limit=256
+persist.sys.spc.enabled=false
+persist.sys.spc.extra_free_enable=false
+persist.sys.spc.screenoff_kill_enable=false
