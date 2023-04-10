@@ -7,32 +7,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "freezeitVS", "freezeitVS\fr
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|ARM = Debug|ARM
-		Debug|ARM64 = Debug|ARM64
-		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
-		Release|ARM = Release|ARM
 		Release|ARM64 = Release|ARM64
-		Release|x64 = Release|x64
-		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|ARM.ActiveCfg = Debug|ARM
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|ARM.Build.0 = Debug|ARM
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|ARM64.ActiveCfg = Debug|ARM64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|ARM64.Build.0 = Debug|ARM64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|x64.ActiveCfg = Debug|x64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|x64.Build.0 = Debug|x64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|x86.ActiveCfg = Debug|x86
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Debug|x86.Build.0 = Debug|x86
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|ARM.ActiveCfg = Release|ARM
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|ARM.Build.0 = Release|ARM
 		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|ARM64.ActiveCfg = Release|ARM64
 		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|ARM64.Build.0 = Release|ARM64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|x64.ActiveCfg = Release|x64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|x64.Build.0 = Release|x64
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|x86.ActiveCfg = Release|x86
-		{DF1C9687-2346-4182-A9E7-8FD35001AC96}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

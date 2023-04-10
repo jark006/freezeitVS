@@ -38,6 +38,11 @@ if [ ${#output} -gt 2 ]; then
     echo "- !!! ⚠️检测到 [Mitlite](f19没有新欢), 请到 LSPosed 手动取消勾选"
 fi
 
+output=$(pm list packages com.mubei.android)
+if [ ${#output} -gt 2 ]; then
+    echo "- !!! ⚠️检测到 [墓碑](离音), 请到 LSPosed 手动取消勾选"
+fi
+
 if [ -e "/data/adb/modules/mubei" ]; then
     echo "- !!! ⚠️已禁用 [自动墓碑后台](奋斗的小青年)"
     touch /data/adb/modules/mubei/disable
@@ -73,13 +78,13 @@ fi
 module_version="$(grep_prop version "$MODPATH"/module.prop)"
 echo "- 正在安装 $module_version"
 
-fullApkFile=$(ls "$MODPATH"/freezeit*.apk)
+fullApkPath=$(ls "$MODPATH"/freezeit*.apk)
 apkPath=$TMPDIR/freezeit.apk
-mv -f "$fullApkFile" "$apkPath"
+mv -f "$fullApkPath" "$apkPath"
 chmod 666 "$apkPath"
 
 echo "- 冻它APP 正在安装..."
-output=$(pm install -r -f "$apkPath")
+output=$(pm install -r -f "$apkPath" 2>&1)
 if [ "$output" == "Success" ]; then
     echo "- 冻它APP 安装成功"
     rm -rf "$apkPath"
@@ -87,7 +92,7 @@ else
     echo "- 冻它APP 安装失败, 原因: [$output] 尝试卸载再安装..."
     pm uninstall io.github.jark006.freezeit
     sleep 1
-    output=$(pm install -r -f "$apkPath")
+    output=$(pm install -r -f "$apkPath" 2>&1)
     if [ "$output" == "Success" ]; then
         echo "- 冻它APP 安装成功"
         echo "- !!! ⚠️请到LSPosed管理器重新启用冻它, 然后再重启"
@@ -103,10 +108,10 @@ else
     fi
 fi
 
-# 仅限 MIUI 13~15
+# 仅限 MIUI 12~15
 MIUI_VersionCode=$(getprop ro.miui.ui.version.code)
-if [ "$MIUI_VersionCode" -ge 13 ] && [ "$MIUI_VersionCode" -le 15 ]; then
-    echo "已配置禁用Millet参数"
+if [ "$MIUI_VersionCode" -ge 12 ] && [ "$MIUI_VersionCode" -le 15 ]; then
+    echo "- 已配置禁用Millet参数"
 else
     rm "$MODPATH"/system.prop
 fi

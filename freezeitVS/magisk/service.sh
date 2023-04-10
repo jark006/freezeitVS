@@ -16,13 +16,13 @@ wait_until_login() {
     local test_file="/sdcard/Android/.PERMISSION_TEST_FREEZEIT"
     true >"$test_file"
     while [ ! -f "$test_file" ]; do
-        sleep 1
+        sleep 5
         true >"$test_file"
     done
     rm "$test_file"
 }
 
-echo "[$(date "+%Y-%m-%d %H:%M:%S")] 模块开始运行" >"$bootLogPath"
+echo "[$(date "+%Y-%m-%d %H:%M:%S")] 开始运行服务脚本" >"$bootLogPath"
 
 wait_until_login
 

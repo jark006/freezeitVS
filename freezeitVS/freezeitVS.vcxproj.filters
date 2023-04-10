@@ -85,6 +85,7 @@
     <None Include="note\冻它2.6.2 _冻结操作逻辑路线.xlsx">
       <Filter>note</Filter>
     </None>
+    <None Include="build_x64.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="changelog.txt" />
