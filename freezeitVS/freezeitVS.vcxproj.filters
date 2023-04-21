@@ -55,12 +55,6 @@
     <None Include="magisk\customize.sh">
       <Filter>magisk</Filter>
     </None>
-    <None Include="magisk\freezeit">
-      <Filter>magisk</Filter>
-    </None>
-    <None Include="magisk\freezeit_v2.6.4.apk">
-      <Filter>magisk</Filter>
-    </None>
     <None Include="magisk\module.prop">
       <Filter>magisk</Filter>
     </None>
@@ -85,7 +79,8 @@
     <None Include="note\冻它2.6.2 _冻结操作逻辑路线.xlsx">
       <Filter>note</Filter>
     </None>
-    <None Include="build_x64.ps1" />
+    <None Include="build_ARM64.ps1" />
+    <None Include="build_X64.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="changelog.txt" />

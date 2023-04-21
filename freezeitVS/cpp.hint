@@ -3,11 +3,10 @@
 // 有关详细信息，请参见 https://go.microsoft.com/fwlink/?linkid=865984
 #define START_TIME_COUNT auto start_clock = clock()
 #define START_TIME_COUNT ((void)0)
-#define END_TIME_COUNT int duration_us=clock()-start_clock;freezeit.log("%s(): %d.%03d ms", __FUNCTION__, duration_us/1000, duration_us%1000)
-#define END_TIME_COUNT int duration_ms=clock()-start_clock;freezeit.log("%s(): %d ms", __FUNCTION__, duration_ms)
+#define END_TIME_COUNT int duration_us=clock()-start_clock;freezeit.logFmt("%s(): %d.%03d ms", __FUNCTION__, duration_us/1000, duration_us%1000)
+#define END_TIME_COUNT int duration_ms=clock()-start_clock;freezeit.logFmt("%s(): %d ms", __FUNCTION__, duration_ms)
 #define END_TIME_COUNT ((void)0)
 #define DT_DIR
-#define STRNCAT(buf, len, __VA_ARGS__) len += snprintf(buf + len, sizeof(buf) - len, __VA_ARGS__)
 #define stderr
 #define errno
 #define SIGKILL

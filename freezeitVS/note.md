@@ -105,6 +105,12 @@ netstat -apn
 所有任务
 cat /dev/cpuset/tasks
 
+随机生成UUID
+cat /proc/sys/kernel/random/uuid
+
+SOC ID
+cat /sys/bus/soc/devices/soc0/serial_number
+
 CPU核心 可用核心
 /sys/devices/system/cpu/present
 
@@ -822,10 +828,10 @@ if(clazz != null) {
   int mini = len / 60;
   int sec = len % 60;
   if (day < 180) {
-    freezeit.log("内测到期时间: %s", endStr);
-    freezeit.log("内测剩余时间: %d天%02d时%02d分%02d秒", day, hour, mini, sec);
+    freezeit.logFmt("内测到期时间: %s", endStr);
+    freezeit.logFmt("内测剩余时间: %d天%02d时%02d分%02d秒", day, hour, mini, sec);
   } else {
-    freezeit.log("冻它模块 长期版");
+    freezeit.logFmt("冻它模块 长期版");
   }
 #endif
 ```

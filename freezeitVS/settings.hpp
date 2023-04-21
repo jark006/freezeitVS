@@ -58,7 +58,7 @@ public:
 
 	uint8_t& enableBatteryMonitor = settingsVar[13];   // 电池监控
 	uint8_t& enableCurrentFix = settingsVar[14];       // 电池电流校准
-	uint8_t& enableBreakNetwork = settingsVar[15];     // QQ/TIM冻结断网
+	//uint8_t& enableBreakNetwork = settingsVar[15];     // QQ/TIM冻结断网
 	uint8_t& enableLMK = settingsVar[16];              // 调整 lmk 参数 仅安卓11-15
 	uint8_t& enableDoze = settingsVar[17];             // 深度Doze
 
@@ -78,12 +78,12 @@ public:
 
 			if (readSize != SETTINGS_SIZE) {
 				freezeit.log("设置文件校验失败, 将使用默认设置参数, 并更新设置文件");
-				freezeit.log("读取大小: %d Bytes.  要求大小: 256 Bytes.", readSize);
+				freezeit.logFmt("读取大小: %d Bytes.  要求大小: 256 Bytes.", readSize);
 				freezeit.log(save() ? "⚙️设置成功" : "🔧设置文件写入失败");
 			}
 			else if (tmp[0] != settingsVer) {
 				freezeit.log("设置文件版本不兼容, 将使用默认设置参数, 并更新设置文件");
-				freezeit.log("读取版本: V%d 要求版本: V%d", static_cast<int>(tmp[0]),
+				freezeit.logFmt("读取版本: V%d 要求版本: V%d", static_cast<int>(tmp[0]),
 					static_cast<int>(settingsVer));
 				freezeit.log(save() ? "⚙️设置成功" : "🔧设置文件写入失败");
 			}
@@ -92,33 +92,33 @@ public:
 
 				bool isError = false;
 				if (clusterBind > 6) {
-					freezeit.log("核心绑定参数[%d]错误, 已重置为 [0] [1] [2] [3]",
+					freezeit.logFmt("核心绑定参数[%d]错误, 已重置为 [0] [1] [2] [3]",
 						static_cast<int>(clusterBind));
 					clusterBind = 0;
 					isError = true;
 				}
 				if (setMode > 5) {
-					freezeit.log("冻结模式参数[%d]错误, 已重设为 全局SIGSTOP", static_cast<int>(setMode));
+					freezeit.logFmt("冻结模式参数[%d]错误, 已重设为 全局SIGSTOP", static_cast<int>(setMode));
 					setMode = 0;
 					isError = true;
 				}
 				if (refreezeTimeoutIdx > 4) {
-					freezeit.log("定时压制参数[%d]错误, 已重设为 30分钟", static_cast<int>(refreezeTimeoutIdx));
+					freezeit.logFmt("定时压制参数[%d]错误, 已重设为 30分钟", static_cast<int>(refreezeTimeoutIdx));
 					refreezeTimeoutIdx = 2;
 					isError = true;
 				}
 				if (freezeTimeout < 1 || freezeTimeout > 60) {
-					freezeit.log("超时冻结参数[%d]错误, 已重置为10秒", static_cast<int>(freezeTimeout));
+					freezeit.logFmt("超时冻结参数[%d]错误, 已重置为10秒", static_cast<int>(freezeTimeout));
 					freezeTimeout = 10;
 					isError = true;
 				}
 				if (wakeupTimeoutMin < 3 || wakeupTimeoutMin > 120) {
-					freezeit.log("定时解冻参数[%d]错误, 已重置为30分", static_cast<int>(wakeupTimeoutMin));
+					freezeit.logFmt("定时解冻参数[%d]错误, 已重置为30分", static_cast<int>(wakeupTimeoutMin));
 					wakeupTimeoutMin = 30;
 					isError = true;
 				}
 				if (terminateTimeout < 3 || terminateTimeout > 120) {
-					freezeit.log("超时杀死参数[%d]错误, 已重置为30秒", static_cast<int>(terminateTimeout));
+					freezeit.logFmt("超时杀死参数[%d]错误, 已重置为30秒", static_cast<int>(terminateTimeout));
 					terminateTimeout = 30;
 					isError = true;
 				}
@@ -132,7 +132,7 @@ public:
 		}
 	}
 
-	uint8_t& operator[](int key) {
+	uint8_t& operator[](const int key) {
 		return settingsVar[key];
 	}
 
@@ -178,14 +178,12 @@ public:
 			if (writeSize == SETTINGS_SIZE)
 				return true;
 
-			const char* fmt = "设置异常, 文件实际写入[%d]Bytes";
-			freezeit.log(fmt, writeSize);
-			fprintf(stderr, fmt, writeSize);
+			freezeit.logFmt("设置异常, 文件实际写入[%d]Bytes", writeSize);
 		}
 		return false;
 	}
 
-	int checkAndSet(int idx, int val, char* replyBuf) {
+	int checkAndSet(const int idx, const int val, char* replyBuf) {
 		const size_t REPLY_BUF_SIZE = 2048;
 
 		switch (idx) {
@@ -253,7 +251,7 @@ public:
 		break;
 
 		default: {
-			freezeit.log("🔧设置失败，设置项不存在, [%d]:[%d]", idx, val);
+			freezeit.logFmt("🔧设置失败，设置项不存在, [%d]:[%d]", idx, val);
 			return snprintf(replyBuf, REPLY_BUF_SIZE, "设置项不存在, [%d]:[%d]", idx, val);
 		}
 		}
@@ -264,7 +262,7 @@ public:
 			return snprintf(replyBuf, REPLY_BUF_SIZE, "success");
 		}
 		else {
-			freezeit.log("🔧设置失败，写入设置文件失败, [%d]:%d", idx, val);
+			freezeit.logFmt("🔧设置失败，写入设置文件失败, [%d]:%d", idx, val);
 			return snprintf(replyBuf, REPLY_BUF_SIZE, "写入设置文件失败, [%d]:%d", idx, val);
 		}
 	}

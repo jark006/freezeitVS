@@ -20,11 +20,22 @@
 #include "freezer.hpp"
 #include "server.hpp"
 
+#define TEST_CODE 0
+
+#if TEST_CODE
+void test();
+#endif
+
 int main(int argc, char **argv) {
+#if TEST_CODE
+    test();
+#else
+    char tmp[1024];
+    string fullPath(realpath(argv[0], tmp));
 
     Utils::Init();
 
-    Freezeit freezeit(argc, argv[0]);
+    Freezeit freezeit(argc, move(fullPath));
     Settings settings(freezeit);
     ManagedApp managedApp(freezeit, settings);
     SystemTools systemTools(freezeit, settings);
@@ -32,6 +43,28 @@ int main(int argc, char **argv) {
     Freezer freezer(freezeit, settings, managedApp, systemTools, doze);
     Server server(freezeit, settings, managedApp, systemTools, doze, freezer);
 
+    // 184744
+    constexpr int size = sizeof(Freezeit) + sizeof(Settings) + sizeof(ManagedApp) + sizeof(SystemTools)
+        + sizeof(Doze) + sizeof(Freezer) + sizeof(Server);
+
     sleep(3600 * 24 * 365);//放年假
+#endif
     return 0;
 }
+
+#if TEST_CODE
+
+void pp(const char* s) {
+    printf("pp[%s]\n", s);
+}
+
+void test() {
+    char tmp[1024] = {};
+    scanf("%s", tmp);
+    printf("Before\n");
+    pp(Utils::bin2Hex(tmp, strlen(tmp)).c_str());
+    printf("End\n");
+}
+
+
+#endif

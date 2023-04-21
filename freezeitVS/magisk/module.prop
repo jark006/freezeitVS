@@ -1,7 +1,7 @@
 id=freezeit
 name=冻它
-version=2.6.5
-versionCode=206051
+version=2.6.6Alpha
+versionCode=206060
 author=JARK006
 description=实现部分墓碑机制，自动暂停后台应用运行
 updateJson=https://ghproxy.com/https://raw.githubusercontent.com/jark006/freezeitRelease/main/update.json

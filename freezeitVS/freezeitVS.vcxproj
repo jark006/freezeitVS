@@ -33,12 +33,11 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="build_ARM64.ps1" />
     <None Include="build_pack.ps1" />
-    <None Include="build_x64.ps1" />
+    <None Include="build_X64.ps1" />
     <None Include="cpp.hint" />
     <None Include="magisk\customize.sh" />
-    <None Include="magisk\freezeit" />
-    <None Include="magisk\freezeit_v2.6.4.apk" />
     <None Include="magisk\module.prop" />
     <None Include="magisk\service.sh" />
     <None Include="magisk\system.prop" />

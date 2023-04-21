@@ -3,6 +3,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -76,7 +77,7 @@ constexpr auto FORK_DOUBLE = 1;
 // *****************************
 
 #if DEBUG_LOG
-#define DLOG(...) freezeit.log(__VA_ARGS__)
+#define DLOG(...) freezeit.logFmt(__VA_ARGS__)
 #else
 #define DLOG(...) ((void)0)
 #endif
@@ -84,9 +85,9 @@ constexpr auto FORK_DOUBLE = 1;
 #if DEBUG_DURATION
 #define START_TIME_COUNT auto start_clock = clock()
 #if CLOCKS_PER_SEC == 1000000
-#define END_TIME_COUNT int duration_us=clock()-start_clock;freezeit.log("%s(): %d.%03d ms", __FUNCTION__, duration_us/1000, duration_us%1000)
+#define END_TIME_COUNT int duration_us=clock()-start_clock;freezeit.logFmt("%s(): %d.%03d ms", __FUNCTION__, duration_us/1000, duration_us%1000)
 #elif CLOCKS_PER_SEC == 1000
-#define END_TIME_COUNT int duration_ms=clock()-start_clock;freezeit.log("%s(): %d ms", __FUNCTION__, duration_ms)
+#define END_TIME_COUNT int duration_ms=clock()-start_clock;freezeit.logFmt("%s(): %d ms", __FUNCTION__, duration_ms)
 #else
 #error CLOCKS_PER_SEC value is not support
 #endif
@@ -94,8 +95,6 @@ constexpr auto FORK_DOUBLE = 1;
 #define START_TIME_COUNT ((void)0)
 #define END_TIME_COUNT   ((void)0)
 #endif
-
-#define STRNCAT(buf, len, ...) len += snprintf(buf + len, sizeof(buf) - len, __VA_ARGS__)
 
 enum class WORK_MODE : uint32_t {
 	GLOBAL_SIGSTOP = 0,
@@ -108,7 +107,9 @@ enum class WORK_MODE : uint32_t {
 enum class FREEZE_MODE : uint32_t {
 	TERMINATE = 10,
 	SIGNAL = 20,
+	SIGNAL_BREAK = 21,
 	FREEZER = 30,
+	FREEZER_BREAK = 31,
 	WHITELIST = 40,
 	WHITEFORCE = 50,
 };
@@ -150,10 +151,33 @@ struct appInfoStruct {
 	int failFreezeCnt = 0;         // 冻结失败计数
 	bool isSystemApp;              // 是否系统应用
 	time_t startRunningTime = 0;   // 某次开始运行时刻
+	time_t stopRunningTime = 0;    // 某次冻结运行时刻
 	time_t totalRunningTime = 0;   // 运行时长
 	string package;                // 包名
 	string label;                  // 名称
 	vector<int> pids;              // PID列表
+
+	bool needBreakNetwork() {
+		return freezeMode == FREEZE_MODE::SIGNAL_BREAK || freezeMode == FREEZE_MODE::FREEZER_BREAK;
+	}
+	bool isSignalMode() {
+		return freezeMode == FREEZE_MODE::SIGNAL_BREAK || freezeMode == FREEZE_MODE::SIGNAL;
+	}
+	bool isFreezeMode() {
+		return freezeMode == FREEZE_MODE::FREEZER_BREAK || freezeMode == FREEZE_MODE::FREEZER;
+	}
+	bool needFreezer() {
+		return freezeMode <= FREEZE_MODE::SIGNAL && freezeMode < FREEZE_MODE::WHITELIST;
+	}
+	bool isWhitelist() {
+		return freezeMode >= FREEZE_MODE::WHITELIST;
+	}
+	bool isBlacklist() {
+		return freezeMode < FREEZE_MODE::WHITELIST;
+	}
+	bool isTerminateMode() {
+		return freezeMode == FREEZE_MODE::TERMINATE;
+	}
 };
 
 struct cfgStruct {
@@ -161,20 +185,56 @@ struct cfgStruct {
 	bool isTolerant = true;
 };
 
-template<size_t N=16>
+template<size_t N=32>
 class stackString {
 public:
 	size_t maxLen{ N };
 	size_t length{ 0 };
 	char data[N];
-	char* c_str() { return data; }
+
+	const char* c_str() { return data; }
+	const char* operator* () { return data; }
+
+	stackString() { data[0] = 0; }
+	stackString(const string_view& s) {
+		memcpy(data, s.data(), s.length());
+		length = s.length();
+		data[length] = 0;
+	}
+	stackString(const char* s, const size_t len) {
+		memcpy(data, s, len);
+		length = len;
+		data[length] = 0;
+	}
+
+	stackString& append(const int n) {
+		char tmp[16];
+		return append(tmp, snprintf(tmp, sizeof(tmp), "%d", n));
+	}
+
+	stackString& append(const char* s) {
+		return append(s, strlen(s));
+	}
+
+	stackString& append(const char* s, const int len) {
+		return append(s, static_cast<size_t>(len));
+	}
+
+	stackString& append(const char* s, const size_t len) {
+		memcpy(data + length, s, len);
+		length += len;
+		data[length] = 0;
+		return *this;
+	}
 
 	template<typename... Args>
-	void append(const char*fmt, Args&&... args){
-		if (length >= maxLen)return;
-
-		length += snprintf(data + length, maxLen - length, fmt, std::forward<Args>(args)...);
+	stackString& appendFmt(const char* fmt, Args&&... args) {
+		if (length < maxLen)
+			length += snprintf(data + length, maxLen - length, fmt, std::forward<Args>(args)...);
+		return *this;
 	}
+
+	void clear() { length = 0;  data[0] = 0; }
 };
 
 
@@ -206,8 +266,11 @@ namespace Utils {
 		while ((foundIdx = src.find(oldBlock, nextBeginIdx)) != string::npos) {
 			src.replace(foundIdx, oldBlock.length(), newBlock);
 
-			nextBeginIdx = foundIdx + newBlock.length(); // 替换后，在新区块【后面】开始搜索
-			// nextBeginIdx = foundIdx;    // 替换后，以新区块【起点】开始搜索。即：替换之后的新区块连同【后续】内容仍有可能满足条件而被继续替换
+			// 替换后，在新区块【后面】开始搜索
+			nextBeginIdx = foundIdx + newBlock.length(); 
+
+			// 替换后，以新区块【起点】开始搜索。即：替换之后的新区块连同【后续】内容仍有可能满足条件而被继续替换
+			// nextBeginIdx = foundIdx;
 
 			// 替换后，在新区块【前后】搜索，新区块连同【前-后】内容仍有可能满足条件而被继续替换
 			// nextBeginIdx = foundIdx > oldBlock.length() ? (foundIdx - oldBlock.length()) : 0;
@@ -220,7 +283,7 @@ namespace Utils {
 		if (len == 0) return "";
 		string res(len * 3, ' ');
 		for (int i = 0; i < len; i++) {
-			uint8_t value = ((uint8_t*)bytes)[i];
+			const uint8_t value = reinterpret_cast<const uint8_t*>(bytes)[i];
 			res[i * 3L] = charList[value >> 4];
 			res[i * 3L + 1] = charList[value & 0x0f];
 		}
@@ -366,11 +429,11 @@ namespace Utils {
 	}
 
 	int localSocketRequest(
-		const XPOSED_CMD& requestCode,
+		const XPOSED_CMD requestCode,
 		const void* payloadBuff,
-		const int& payloadLen,
+		const int payloadLen,
 		int* recvBuff,
-		const size_t& maxRecvLen) {
+		const size_t maxRecvLen) {
 
 		// Socket 位于Linux抽象命名空间， 而不是文件路径
 		// https://blog.csdn.net/howellzhu/article/details/111597734
@@ -408,18 +471,19 @@ namespace Utils {
 	}
 
 
-	void printException(const char* versionStr, const int& exceptionCnt, const char* exceptionBuf,
-		const ssize_t& bufSize) {
+	void printException(
+		const char* versionStr, 
+		const int exceptionCnt, 
+		const char* exceptionBuf,
+		const size_t bufSize) {
 		auto fp = fopen("/sdcard/Android/freezeit_crash_log.txt", "ab");
 		if (!fp) return;
 
 		auto timeStamp = time(nullptr);
 		auto tm = localtime(&timeStamp);
 
-		fprintf(fp, "[%04d-%02d-%02d %02d:%02d:%02d ] [%d:%s] ",
-			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min,
-			tm->tm_sec,
-			errno, strerror(errno));
+		fprintf(fp, "[%04d-%02d-%02d %02d:%02d:%02d] ",
+			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 		if (versionStr)fprintf(fp, "[%s] ", versionStr);
 		if (exceptionCnt) fprintf(fp, "第%d次异常 ", exceptionCnt);
@@ -432,13 +496,15 @@ namespace Utils {
 
 
 	void Init() {
-		srand(clock());
-		usleep(1000 * (rand() & 0x7ff)); //随机休眠 1ms ~ 2s
+		auto now = std::chrono::system_clock::now();
+		auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+		srand(ns);
+		usleep(1000 * (rand() & 0xfff)); //随机休眠 1ms ~ 4s
 
 		// 检查是否还有其他freezeit进程，防止进程多开
 		char buf[256] = { 0 };
 		if (popenRead("pidof freezeit", buf, sizeof(buf)) == 0) {
-			printException(nullptr, 0, "进程检测失败", 21);
+			printException(nullptr, 0, "进程检测失败", 18);
 			exit(-1);
 		}
 
@@ -461,8 +527,7 @@ namespace Utils {
 		pid_t pid = fork();
 
 		if (pid < 0) { //创建失败
-			const char tips[] = "脱离终端Fork失败";
-			printException(nullptr, 0, tips, sizeof(tips) - 1);
+			printException(nullptr, 0, "脱离终端Fork失败", 22);
 			exit(-1);
 		}
 		else if (pid > 0) { //父进程返回的是 子进程的pid
@@ -471,7 +536,7 @@ namespace Utils {
 
 		setsid();// 子进程 建立新会话
 		umask(0);
-		// chdir("/"); //改变工作目录会导致 realpath() 失效
+		chdir("/");
 
 		// signal(SIGCHLD, SIG_IGN);//屏蔽SIGCHLD信号 通知内核对子进程的结束不关心，由内核回收
 		int fd_response[2];
@@ -479,14 +544,13 @@ namespace Utils {
 
 		pid = fork(); //成为守护进程后再次Fork, 父进程监控， 子进程工作
 		if (pid < 0) {
-			const char tips[] = "创建工作进程Fork失败";
-			printException(nullptr, 0, tips, sizeof(tips) - 1);
+			printException(nullptr, 0, "创建工作进程Fork失败", 28);
 			exit(-1);
 		}
 		else if (pid > 0) { //父进程 监控子进程输出的异常信息，并写到异常日志
 			close(fd_response[1]); // 1 关闭写端
 
-			char versionStr[16] = {};
+			char versionStr[16] ="Unknown";
 			char exceptionBuf[4096] = {};
 			int exceptionCnt = 0;
 			int zeroCnt = 0;
@@ -502,17 +566,13 @@ namespace Utils {
 					continue;
 				}
 
-				exceptionCnt++;
+				printException(versionStr, ++exceptionCnt, exceptionBuf, readLen);
 
 				if (zeroCnt >= 3 || exceptionCnt >= 1000) {
-					if (zeroCnt >= 3) {
-						const char tips[] = "工作进程已异常退出";
-						printException(versionStr, 0, tips, sizeof(tips) - 1);
-					}
-					else {
-						const char tips[] = "工作进程已达最大异常次数, 即将强制关闭";
-						printException(versionStr, 0, tips, sizeof(tips) - 1);
-					}
+					if (zeroCnt >= 3)
+						printException(versionStr, 0, "工作进程已异常退出", 27);
+					else
+						printException(versionStr, 0, "工作进程已达最大异常次数, 即将强制关闭", 56);
 
 					if (kill(pid, SIGKILL) < 0) {
 						char tips[128];
@@ -529,9 +589,6 @@ namespace Utils {
 					}
 
 					exit(-1);
-				}
-				else {
-					printException(versionStr, exceptionCnt, exceptionBuf, readLen);
 				}
 			}
 		}
@@ -566,17 +623,17 @@ namespace MAGISK {
 
 // https://github.com/tiann/KernelSU/blob/main/manager/app/src/main/cpp/ksu.cc
 namespace KSU {
-	constexpr int CMD_GRANT_ROOT = 0;
-	constexpr int CMD_BECOME_MANAGER = 1;
-	constexpr int CMD_GET_VERSION = 2;
-	constexpr int CMD_ALLOW_SU = 3;
-	constexpr int CMD_DENY_SU = 4;
-	constexpr int CMD_GET_ALLOW_LIST = 5;
-	constexpr int CMD_GET_DENY_LIST = 6;
-	constexpr int CMD_CHECK_SAFEMODE = 9;
+	const int CMD_GRANT_ROOT = 0;
+	const int CMD_BECOME_MANAGER = 1;
+	const int CMD_GET_VERSION = 2;
+	const int CMD_ALLOW_SU = 3;
+	const int CMD_DENY_SU = 4;
+	const int CMD_GET_ALLOW_LIST = 5;
+	const int CMD_GET_DENY_LIST = 6;
+	const int CMD_CHECK_SAFEMODE = 9;
 
 	bool ksuctl(int cmd, void* arg1, void* arg2) {
-		constexpr uint32_t KERNEL_SU_OPTION{ 0xDEADBEEF };
+		const uint32_t KERNEL_SU_OPTION{ 0xDEADBEEF };
 		uint32_t result = 0;
 		prctl(KERNEL_SU_OPTION, cmd, arg1, arg2, &result);
 		return result == KERNEL_SU_OPTION;
@@ -584,9 +641,7 @@ namespace KSU {
 
 	int get_version_code() {
 		int version = -1;
-		if (ksuctl(CMD_GET_VERSION, &version, nullptr)) {
-			return -1;
-		}
+		ksuctl(CMD_GET_VERSION, &version, nullptr);
 		return version;
 	}
 

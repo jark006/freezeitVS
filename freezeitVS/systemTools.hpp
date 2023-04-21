@@ -78,22 +78,23 @@ public:
 
 		char res[256];
 		if (__system_property_get("gsm.operator.alpha", res) > 0 && res[0] != ',')
-			freezeit.log("运营信息 %s", res);
-		if (__system_property_get("gsm.network.type", res) > 0) freezeit.log("网络类型 %s", res);
+			freezeit.logFmt("运营信息 %s", res);
+		if (__system_property_get("gsm.network.type", res) > 0) freezeit.logFmt("网络类型 %s", res);
 		if (__system_property_get("ro.product.brand", res) > 0) {
-			freezeit.log("设备厂商 %s", res);
+			freezeit.logFmt("设备厂商 %s", res);
 
 			for (int i = 0; i < 8; i++)res[i] |= 32;
+			//*((uint64_t*)res) |= 0x20202020'20202020ULL;
 			if (!strncmp(res, "samsung", 7))
 				isSamsung = true;
 		}
-		if (__system_property_get("ro.product.marketname", res) > 0) freezeit.log("设备型号 %s", res);
-		if (__system_property_get("persist.sys.device_name", res) > 0) freezeit.log("设备名称 %s", res);
+		if (__system_property_get("ro.product.marketname", res) > 0) freezeit.logFmt("设备型号 %s", res);
+		if (__system_property_get("persist.sys.device_name", res) > 0) freezeit.logFmt("设备名称 %s", res);
 		if (__system_property_get("ro.system.build.version.incremental", res) > 0)
-			freezeit.log("系统版本 %s", res);
+			freezeit.logFmt("系统版本 %s", res);
 		if (__system_property_get("ro.soc.manufacturer", res) > 0 &&
 			__system_property_get("ro.soc.model", res + 100) > 0)
-			freezeit.log("硬件平台 %s %s", res, res + 100);
+			freezeit.logFmt("硬件平台 %s %s", res, res + 100);
 
 		InitLMK();
 
@@ -275,19 +276,19 @@ public:
 			const int battery_soh = Utils::readInt("/sys/class/oplus_chg/battery/battery_soh");
 
 			if (charge_full_design) {
-				freezeit.log("🔋电池 设计容量: %dmAh", charge_full_design / 1000);
+				freezeit.logFmt("🔋电池 设计容量: %dmAh", charge_full_design / 1000);
 				int health = 100 * charge_full / charge_full_design;
 				if (40 < health && health <= 100) {
-					freezeit.log("🔋电池 当前容量: %dmAh", charge_full / 1000);
-					freezeit.log("🔋电池 健康程度: %d%%", health);
+					freezeit.logFmt("🔋电池 当前容量: %dmAh", charge_full / 1000);
+					freezeit.logFmt("🔋电池 健康程度: %d%%", health);
 				}
 			}
 
 			if (40 < battery_soh && battery_soh <= 100)
-				freezeit.log("🔋电池 健康程度(内置): %d%%", battery_soh);
+				freezeit.logFmt("🔋电池 健康程度(内置): %d%%", battery_soh);
 
 			if (cycle_count)
-				freezeit.log("🔋电池 循环次数: %d", cycle_count);
+				freezeit.logFmt("🔋电池 循环次数: %d", cycle_count);
 
 			freezeit.log("🔋电池 数据由系统提供, 仅供参考");
 		}
@@ -295,21 +296,19 @@ public:
 			const int mWatt = abs(readBatteryWatt());
 			const int nowMinute = static_cast<int>(time(nullptr) / 60);
 			const int deltaMinute = nowMinute - lastMinute;
-
-			char timeStr[64]{ 0 };
-			size_t len = 0;
-			if (deltaMinute >= 60)
-				STRNCAT(timeStr, len, "%d时", deltaMinute / 60);
-			STRNCAT(timeStr, len, "%d分钟", deltaMinute % 60);
-
+			const int deltaCapacity = nowCapacity - lastCapacity;
 			const int temperature = Utils::readInt("/sys/class/power_supply/battery/temp");
-			freezeit.log("%s到 %d%%  %s%s了%d%%  %.2fw %.1f℃",
-				lastCapacity > nowCapacity ?
-				(deltaMinute == 1 ? "❗耗电" : "🔋放电") :
-				(mWatt > 20'000 ? "⚡快充" : "🔌充电"),
-				nowCapacity, timeStr, lastCapacity > nowCapacity ? "用" : "充",
-				abs(lastCapacity - nowCapacity),
-				mWatt / 1e3, temperature / 1e1);
+
+			stackString<64> timeStr;
+			if (deltaMinute >= 60)
+				timeStr.appendFmt("%d时", deltaMinute / 60);
+			timeStr.appendFmt("%d分钟", deltaMinute % 60);
+
+			freezeit.logFmt("%s到 %d%%  %s%s了%d%%  %.2fw %.1f℃",
+				deltaCapacity < 0 ? (deltaMinute == 1 ? "❗耗电" : "🔋放电") :
+				((mWatt > 20'000 || deltaCapacity >= 3) ? "⚡快充" : "🔌充电"),
+				nowCapacity, *timeStr, deltaCapacity < 0 ? "用" : "充",
+				abs(deltaCapacity), mWatt / 1e3, temperature / 1e1);
 
 			lastMinute = nowMinute;
 			lastCapacity = nowCapacity;
@@ -326,11 +325,10 @@ public:
 			cpuCluster = cpuCluster * 10 + num;
 
 		if (cpuCluster && res.size() < 10) {
-			char buf[256] = "核心频率";
-			size_t len = 12;
+			stackString<128> str("核心频率");
 			for (const auto& [freq, cnt] : res)
-				STRNCAT(buf, len, " %.2fGHz*%d", freq / (freq > 1e8 ? 1e9 : 1e6), cnt);
-			freezeit.log(buf);
+				str.appendFmt(" %.2fGHz*%d", freq / (freq > 1e8 ? 1e9 : 1e6), cnt);
+			freezeit.log(*str);
 		}
 
 		switch (cpuCluster) {
@@ -350,9 +348,9 @@ public:
 
 		cpuCoreAll = sysconf(_SC_NPROCESSORS_CONF);
 		cpuCoreValid = sysconf(_SC_NPROCESSORS_ONLN);
-		freezeit.log("全部核心 %d 可用核心 %d", cpuCoreAll, cpuCoreValid);
+		freezeit.logFmt("全部核心 %d 可用核心 %d", cpuCoreAll, cpuCoreValid);
 		if (cpuCoreAll != cpuCoreValid) {
-			string tips{ "当前离线核心 " };
+			stackString<128> tips("当前离线核心 ");
 			char tmp[64];
 			for (int i = 0; i < cpuCoreAll; i++) {
 				snprintf(tmp, sizeof(tmp), "/sys/devices/system/cpu/cpu%d/online", i);
@@ -361,7 +359,7 @@ public:
 				read(fd, tmp, 1);
 				close(fd);
 				if (tmp[0] == '0')
-					tips += "[" + to_string(i) + "] ";
+					tips.append("[", 1).append(i).append("]", 1);
 			}
 			freezeit.log(tips.c_str());
 		}
@@ -410,24 +408,25 @@ public:
 			break;
 		}
 
-		string tmp = "绑定核心 " + settings.getClusterText();
+		stackString<128> tmp("绑定核心 ");
+		tmp.append(settings.getClusterText().c_str());
 		if (sched_setaffinity(0, sizeof(mask), &mask))
-			tmp += " 失败:" + string(strerror(errno));
+			tmp.append(" 失败:").append(strerror(errno));
 
 		freezeit.log(tmp.c_str());
 		usleep(1000);
 
 		CPU_ZERO(&mask);
 		if (sched_getaffinity(0, sizeof(mask), &mask) == 0) {
-			string tips{ "所在核心 " };
+			stackString<128> tips("所在核心");
 			for (int i = 0; i < cpuCoreAll; i++) {
 				if (CPU_ISSET(i, &mask))
-					tips += "[" + to_string(i) + "] ";
+					tips.append(" [", 2).append(i).append("]", 1);
 			}
 			freezeit.log(tips.c_str());
 		}
 		else {
-			freezeit.log("获取当前所在核心失败, ERROR [%d]:[%s]", errno, strerror(errno));
+			freezeit.logFmt("获取当前所在核心失败, ERROR [%d]:[%s]", errno, strerror(errno));
 		}
 	}
 
@@ -535,7 +534,7 @@ public:
 
 	// https://rosettacode.org/wiki/Bitmap/Bresenham%27s_line_algorithm#C
 	// Bresenham s_line_algorithm
-	void drawLine(uint32_t*& imgBuf, const uint32_t width, const uint32_t COLOR,
+	void drawLine(uint32_t* imgBuf, const uint32_t width, const uint32_t COLOR,
 		int x0, int y0, const int x1, const int y1) {
 
 		//delta x y,  step x y
@@ -543,7 +542,7 @@ public:
 		const int dy = abs(y1 - y0);
 		const int sx = x0 < x1 ? 1 : -1;
 		const int sy = y0 < y1 ? 1 : -1;
-		int err = (dx > dy ? dx : -dy) / 2, e2;
+		int err = (dx > dy ? dx : -dy) / 2;
 
 		while (true) {
 			if (y0 == y1) {
@@ -563,7 +562,7 @@ public:
 
 			imgBuf[width * y0 + x0] = COLOR;
 
-			e2 = err;
+			const int e2 = err;
 			if (e2 > -dx) {
 				err -= dy;
 				x0 += sx;
@@ -575,7 +574,7 @@ public:
 		}
 	}
 
-	void getCPU_realtime(uint32_t availableMiB) {
+	void getCPU_realtime(const uint32_t availableMiB) {
 		static char path[] = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
 		static uint32_t jiffiesSumLast[9] = {};
 		static uint32_t jiffiesIdleLast[9] = {};
@@ -619,16 +618,16 @@ public:
 						jiffiesList + 4, jiffiesList + 5, jiffiesList + 6);
 
 				if (coreIdx > 8) {
-					freezeit.log("CPU可能超过8核, 暂不支持: coreIdx:%d", coreIdx);
+					freezeit.logFmt("CPU可能超过8核, 暂不支持: coreIdx:%d", coreIdx);
 					break;
 				}
 
-				// user，nice, system, idle, iowait, irq, softirq
+				// user, nice, system, idle, iowait, irq, softirq
 				uint32_t jiffiesSum{ 0 };
-				uint32_t& jiffiesIdle = jiffiesList[3];
 				for (int jiffIdx = 0; jiffIdx < 7; jiffIdx++)
 					jiffiesSum += jiffiesList[jiffIdx];
 
+				uint32_t& jiffiesIdle = jiffiesList[3];
 				if (jiffiesSumLast[coreIdx] == 0) {
 					jiffiesSumLast[coreIdx] = jiffiesSum;
 					jiffiesIdleLast[coreIdx] = jiffiesIdle;
@@ -636,7 +635,7 @@ public:
 				else {
 					const uint32_t sumDelta = jiffiesSum - jiffiesSumLast[coreIdx];
 					const uint32_t idleDelta = jiffiesIdle - jiffiesIdleLast[coreIdx];
-					const int& usage = (sumDelta == 0 || idleDelta == 0 || idleDelta > sumDelta) ?
+					const int usage = (sumDelta == 0 || idleDelta == 0 || idleDelta > sumDelta) ?
 						0 : (100 * (sumDelta - idleDelta) / sumDelta);
 
 					cpuRealTime[cpuBucketIdx][coreIdx].usage = usage;
@@ -653,7 +652,7 @@ public:
 
 
 	// 0获取失败 1失败 2成功
-	int breakNetworkByLocalSocket(int uid) {
+	int breakNetworkByLocalSocket(const int uid) {
 		START_TIME_COUNT;
 
 		int buff[64];
@@ -661,14 +660,14 @@ public:
 			sizeof(buff));
 
 		if (recvLen == 0) {
-			freezeit.log("%s() 工作异常, 请确认LSPosed中冻它勾选系统框架, 然后重启", __FUNCTION__);
+			freezeit.logFmt("%s() 工作异常, 请确认LSPosed中冻它勾选系统框架, 然后重启", __FUNCTION__);
 			END_TIME_COUNT;
 			return 0;
 		}
 		else if (recvLen != 4) {
-			freezeit.log("%s() 返回数据异常 recvLen[%d]", __FUNCTION__, recvLen);
+			freezeit.logFmt("%s() 返回数据异常 recvLen[%d]", __FUNCTION__, recvLen);
 			if (recvLen > 0 && recvLen < 64 * 4)
-				freezeit.log("DumpHex: %s", Utils::bin2Hex(buff, recvLen).c_str());
+				freezeit.logFmt("DumpHex: %s", Utils::bin2Hex(buff, recvLen).c_str());
 			END_TIME_COUNT;
 			return 0;
 		}

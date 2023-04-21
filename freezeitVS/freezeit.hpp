@@ -40,24 +40,17 @@ private:
 			(__DATE__[0] == 'O' || __DATE__[0] == 'N' || __DATE__[0] == 'D') ? '1' : '0',
 
 			// Second month letter Jan, Jun or Jul
-			(__DATE__[0] == 'J') ? ((__DATE__[1] == 'a') ? '1' : ((__DATE__[2] == 'n') ? '6' : '7'))
-								 : (__DATE__[0] == 'F') ? '2'// Feb
-														: (__DATE__[0] == 'M')
-														  ? (__DATE__[2] == 'r') ? '3'
-																				 : '5'// Mar or May
-														  : (__DATE__[0] == 'A')
-															? (__DATE__[1] == 'p') ? '4'
-																				   : '8'// Apr or Aug
-															: (__DATE__[0] == 'S') ? '9'// Sep
-																				   : (__DATE__[0] ==
-																					  'O')
-																					 ? '0'// Oct
-																					 : (__DATE__[0] ==
-																						'N')
-																					   ? '1'// Nov
-																					   : (__DATE__[0] ==
-																						  'D') ? '2'
-																							   : 'X',// Dec
+			(__DATE__[0] == 'J') ? ((__DATE__[1] == 'a') ? '1'
+			: ((__DATE__[2] == 'n') ? '6' : '7'))
+			: (__DATE__[0] == 'F') ? '2'// Feb
+			: (__DATE__[0] == 'M') ? (__DATE__[2] == 'r') ? '3' : '5'// Mar or May
+			: (__DATE__[0] == 'A') ? (__DATE__[1] == 'p') ? '4' : '8'// Apr or Aug
+			: (__DATE__[0] == 'S') ? '9'// Sep
+			: (__DATE__[0] == 'O') ? '0'// Oct
+			: (__DATE__[0] == 'N') ? '1'// Nov
+			: (__DATE__[0] == 'D') ? '2'// Dec
+			: 'X',
+
 			'-',
 			__DATE__[4] == ' ' ? '0' : __DATE__[4],// First day letter, replace space with digit
 			__DATE__[5],// Second day letter
@@ -196,7 +189,7 @@ private:
 			0x91,  //特殊结束符
 	};
 
-	void toMem(const char* logStr, const int& len) {
+	void toMem(const char* logStr, const int len) {
 		if ((position + len) >= BUFF_SIZE)
 			position = 0;
 
@@ -204,7 +197,7 @@ private:
 		position += len;
 	}
 
-	void toFile(const char* logStr, const int& len) {
+	void toFile(const char* logStr, const int len) {
 		auto fp = fopen(LOG_PATH, "ab");
 		if (!fp) {
 			fprintf(stderr, "日志输出(追加模式)失败 [%d][%s]", errno, strerror(errno));
@@ -246,12 +239,10 @@ public:
 
 	Freezeit& operator=(Freezeit&&) = delete;
 
-	Freezeit(int argc, const char* exePath) {
+	Freezeit(int argc, const string fullPath) {
 
 		Utils::myDecode(checkInfo, sizeof(checkInfo));
 
-		char tmp[1024 * 4];
-		string fullPath(realpath(exePath, tmp));
 		if (!fullPath.ends_with((const char*)checkInfo[0])) {
 			fprintf(stderr, "路径不正确 [%s]", fullPath.c_str());
 			exit(-1);
@@ -301,6 +292,7 @@ public:
 			exit(-1);
 		}
 
+		char tmp[1024*4];
 		while (!feof(fp)) {
 			fgets(tmp, sizeof(tmp), fp);
 			if (!isalpha(tmp[0])) continue;
@@ -325,8 +317,8 @@ public:
 
 		Utils::myDecode(authorInfo, sizeof(authorInfo));
 		log((const char*)authorInfo);
-		log("模块版本 %s", prop["version"].c_str());
-		log("编译时间 %s %s", compilerDate, __TIME__);
+		logFmt("模块版本 %s", prop["version"].c_str());
+		logFmt("编译时间 %s %s UTC+8", compilerDate, __TIME__);
 
 		fprintf(stderr, "version %s", prop["version"].c_str()); // 发送当前版本信息给监控进程
 
@@ -408,10 +400,7 @@ public:
 	void log(const string& logContent) {
 		log(logContent.c_str());
 	}
-
-	void log(const char* fmt, ...) {
-		lock_guard<mutex> lock(logPrintMutex);
-
+	void formatTime() {
 		time_t timeStamp = time(nullptr) + 8 * 3600L;
 		int hour = (timeStamp / 3600) % 24;
 		int min = (timeStamp % 3600) / 60;
@@ -425,10 +414,31 @@ public:
 		lineCache[7] = (sec / 10) + '0';
 		lineCache[8] = (sec % 10) + '0';
 
-		va_list args{};
-		va_start(args, fmt);
-		int len = vsnprintf(lineCache + 11, (size_t)(LINE_SIZE - 11), fmt, args) + 11;
-		va_end(args);
+	}
+	void log(const char* str) {
+		lock_guard<mutex> lock(logPrintMutex);
+
+		formatTime();
+
+		auto len = strlen(str);
+		memcpy(lineCache + 11, str, len);
+		len += 11;
+
+		lineCache[len++] = '\n';
+
+		if (toFileFlag)
+			toFile(lineCache, len);
+		else
+			toMem(lineCache, len);
+	}
+
+	template<typename... Args>
+	void logFmt(const char* fmt, Args&&... args) {
+		lock_guard<mutex> lock(logPrintMutex);
+
+		formatTime();
+
+		int len = snprintf(lineCache + 11, (size_t)(LINE_SIZE - 11), fmt, std::forward<Args>(args)...) + 11;
 
 		if (len <= 11 || LINE_SIZE <= (len + 1)) {
 			lineCache[11] = 0;

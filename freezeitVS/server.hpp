@@ -167,7 +167,7 @@ public:
 					continue;
 				}
 				else if (recvLen >= RECV_BUF_SIZE) {
-					freezeit.log("数据格式异常 recvLen[%u] HEX[%s]", recvLen,
+					freezeit.logFmt("数据格式异常 recvLen[%u] HEX[%s]", recvLen,
 						Utils::bin2Hex(dataHeader, 6).c_str());
 					close(clnt_sock);
 					continue;
@@ -316,11 +316,11 @@ public:
 					if (managedApp.FREEZE_MODE_SET.contains(freezeMode))
 						newCfg[uid] = { freezeMode, isTolerant };
 					else
-						freezeit.log("错误配置: UID:%d freezeMode:%d isTolerant:%d", uid,
+						freezeit.logFmt("错误配置: UID:%d freezeMode:%d isTolerant:%d", uid,
 							freezeMode, isTolerant);
 				}
 				else
-					freezeit.log("特殊应用: UID:%d, 已强制自由后台", uid);
+					freezeit.logFmt("特殊应用: UID:%d, 已强制自由后台", uid);
 			}
 
 			string tips;
@@ -336,7 +336,7 @@ public:
 					info.label + "]\n";
 			}
 			if (tips.length())
-				freezeit.log("配置变化：\n\n%s", tips.c_str());
+				freezeit.logFmt("配置变化：\n\n%s", tips.c_str());
 
 			// auto runningUids = freezer.getRunningUids(uidSet);
 			auto runningPids = freezer.getRunningPids(uidSet);
@@ -348,7 +348,7 @@ public:
 				freezer.handleSignal(uid, pids, SIGKILL);
 			}
 			if (tips.length())
-				freezeit.log("杀死策略变更的应用: \n%s\n", tips.c_str());
+				freezeit.logFmt("杀死策略变更的应用: \n%s\n", tips.c_str());
 
 			managedApp.loadConfig2CfgTemp(newCfg);
 			managedApp.updateIME2CfgTemp();
@@ -368,7 +368,7 @@ public:
 				"\n")) {
 				const int uid = atoi(str.c_str());
 				if (managedApp.without(uid) || str.length() <= 6)
-					freezeit.log("解析名称错误 [%s]", str.c_str());
+					freezeit.logFmt("解析名称错误 [%s]", str.c_str());
 				else labelList[uid] = str.substr(6);
 			}
 
@@ -379,7 +379,7 @@ public:
 				labelStr += label;
 				labelStr += ']';
 			}
-			freezeit.log("更新 %lu 款应用名称:\n\n%s\n", labelList.size(), labelStr.c_str());
+			freezeit.logFmt("更新 %lu 款应用名称:\n\n%s\n", labelList.size(), labelStr.c_str());
 
 			managedApp.loadLabel(labelList);
 			managedApp.update2xposedByLocalSocket();

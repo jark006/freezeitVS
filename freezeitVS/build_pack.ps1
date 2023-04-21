@@ -26,6 +26,11 @@ $cppFlags = "-std=c++20 -static -s -Ofast -Wall -Wextra -Wshadow -fno-exceptions
 
 log "Compiler..."
 & $clang $target $sysroot $cppFlags.Split(' ') -I. main.cpp -o magisk/${id}
+if (-not$?)
+{
+    log "Compiler fail"
+    exit
+}
 
 Copy-Item changelog.txt magisk -force
 

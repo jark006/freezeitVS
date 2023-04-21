@@ -31,6 +31,8 @@ private:
 			"com.xiaomi.barrage",                   // 弹幕通知
 			"com xiaomi.aireco",                    // 小爱建议
 			"com.xiaomi.account",                   // 小米账号
+			"com.miui.notes",                       // 笔记  冻结会导致系统侧边栏卡住
+			"com.miui.mediaeditor",                 // 相册编辑
 			"com.mfashiongallery.emag",             // 小米画报
 			"com.huawei.hwid",                      // HMS core服务
 
@@ -371,8 +373,10 @@ public:
 
 	const set<FREEZE_MODE> FREEZE_MODE_SET{
 			FREEZE_MODE::TERMINATE,
-			FREEZE_MODE::FREEZER,
 			FREEZE_MODE::SIGNAL,
+			FREEZE_MODE::SIGNAL_BREAK,
+			FREEZE_MODE::FREEZER,
+			FREEZE_MODE::FREEZER_BREAK,
 			FREEZE_MODE::WHITELIST,
 			FREEZE_MODE::WHITEFORCE,
 	};
@@ -396,29 +400,29 @@ public:
 
 	auto& getRaw() { return infoMap; }
 
-	auto& operator[](const int& uid) { return infoMap[uid]; }
+	auto& operator[](const int uid) { return infoMap[uid]; }
 
 	auto& operator[](const string& package) { return infoMap[uidIndex[package]]; }
 
-	[[maybe_unused]] size_t erase(const int& uid) { return infoMap.erase(uid); }
+	size_t erase(const int uid) { return infoMap.erase(uid); }
 
 	size_t size() { return infoMap.size(); }
 
-	[[maybe_unused]] void clear() { infoMap.clear(); }
+	void clear() { infoMap.clear(); }
 
-	bool contains(const int& uid) { return infoMap.contains(uid); }
+	bool contains(const int uid) { return infoMap.contains(uid); }
 
-	[[maybe_unused]] bool contains(const string& package) { return uidIndex.contains(package); }
+	bool contains(const string& package) { return uidIndex.contains(package); }
 
-	bool without(const int& uid) { return !infoMap.contains(uid); }
+	bool without(const int uid) { return !infoMap.contains(uid); }
 
 	bool without(const string& package) { return !uidIndex.contains(package); }
 
-	auto& getLabel(const int& uid) { return infoMap[uid].label; }
+	auto& getLabel(const int uid) { return infoMap[uid].label; }
 
 	int getUid(const string& package) { return uidIndex[package]; }
 
-	[[maybe_unused]] int getUidOrDefault(const string& package, const int& defaultValue) {
+	int getUidOrDefault(const string& package, const int defaultValue) {
 		auto it = uidIndex.find(package);
 		return it != uidIndex.end() ? it->second : defaultValue;
 	}
@@ -429,11 +433,11 @@ public:
 		homePackage = package;
 		const auto& it = uidIndex.find(package);
 		if (it == uidIndex.end()) {
-			freezeit.log("当前桌面信息异常，建议反馈: [%s]", package.c_str());
+			freezeit.logFmt("当前桌面信息异常，建议反馈: [%s]", package.c_str());
 			return;
 		}
 
-		const int& uid = it->second;
+		const int uid = it->second;
 		infoMap[uid].freezeMode = FREEZE_MODE::WHITEFORCE;
 	}
 
@@ -552,7 +556,7 @@ public:
 			return;
 		}
 		else {
-			freezeit.log("刷新应用 %lu  系统[%lu] 三方[%lu]",
+			freezeit.logFmt("刷新应用 %lu  系统[%lu] 三方[%lu]",
 				allAppList.size(), allAppList.size() - thirdAppList.size(),
 				thirdAppList.size());
 		}
@@ -565,10 +569,11 @@ public:
 			const bool isSYS = !thirdAppList.contains(uid);
 			infoMap[uid] = {
 					isSYS ? FREEZE_MODE::WHITELIST : FREEZE_MODE::FREEZER, //freezeMode
-					true,       // isTolerant
+					true,    // isTolerant
 					0,       // failFreezeCnt
 					isSYS,   // isSystemApp
 					0,       // startRunningTime
+					0,       // stopRunningTime
 					0,       // totalRunningTime
 					package, // package
 					package, // label
@@ -594,13 +599,13 @@ public:
 		string line;
 		while (getline(file, line)) {
 			if (line.length() <= 4) {
-				freezeit.log("A配置错误: [%s]", line.c_str());
+				freezeit.logFmt("A配置错误: [%s]", line.c_str());
 				continue;
 			}
 
 			auto value = Utils::splitString(line, " ");
 			if (value.size() != 3 || value[0].empty()) {
-				freezeit.log("B配置错误: [%s]", line.c_str());
+				freezeit.logFmt("B配置错误: [%s]", line.c_str());
 				continue;
 			}
 
@@ -617,7 +622,7 @@ public:
 			const bool isTolerant = atoi(value[2].c_str()) != 0;
 
 			if (!FREEZE_MODE_SET.contains(freezeMode)) {
-				freezeit.log("C配置错误: [%s]", line.c_str());
+				freezeit.logFmt("C配置错误: [%s]", line.c_str());
 				continue;
 			}
 
@@ -699,19 +704,18 @@ public:
 	}
 
 	void saveConfig() {
-		char buf[1024 * 64];
-		size_t len = 0;
+		stackString<1024 * 64> tmp;
 		for (const auto& [uid, cfg] : infoMap)
 			if (cfg.freezeMode < FREEZE_MODE::WHITEFORCE)
-				STRNCAT(buf, len, "%s %d %d\n",
+				tmp.appendFmt("%s %d %d\n",
 					cfg.package.c_str(),
 					static_cast<int>(cfg.freezeMode),
 					cfg.isTolerant ? 1 : 0);
 
-		if (Utils::writeString(cfgPath.c_str(), buf, len))
+		if (Utils::writeString(cfgPath.c_str(), *tmp, tmp.length))
 			freezeit.log("保存配置成功");
 		else
-			freezeit.log("保存配置文件失败: [%s]", cfgPath.c_str());
+			freezeit.logFmt("保存配置文件失败: [%s]", cfgPath.c_str());
 	}
 
 	void update2xposedByLocalSocket() {
@@ -729,8 +733,8 @@ public:
 		tmp += '\n';
 
 		vector<int> tolerantUids;
-		for (const auto& [uid, info] : infoMap) {
-			if (info.freezeMode >= FREEZE_MODE::WHITELIST)
+		for (auto& [uid, info] : infoMap) {
+			if (info.isWhitelist())
 				continue;
 
 			tmp += to_string(uid);
@@ -759,11 +763,11 @@ public:
 				tmp.length(), buff, sizeof(buff));
 
 			if (recvLen != 4) {
-				freezeit.log("%s() 更新到Xposed 第%d次异常 sendLen[%lu] recvLen[%d] %d:%s",
+				freezeit.logFmt("%s() 更新到Xposed 第%d次异常 sendLen[%lu] recvLen[%d] %d:%s",
 					__FUNCTION__, i + 1, tmp.length(), recvLen, errno, strerror(errno));
 
 				if (0 < recvLen && recvLen < static_cast<int>(sizeof(buff)))
-					freezeit.log("DumpHex: [%s]", Utils::bin2Hex(buff, recvLen).c_str());
+					freezeit.logFmt("DumpHex: [%s]", Utils::bin2Hex(buff, recvLen).c_str());
 
 				sleep(1);
 				continue;
@@ -776,11 +780,11 @@ public:
 				freezeit.log("更新到Xposed失败");
 				return;
 			default:
-				freezeit.log("更新到Xposed 未知回应[%d]", buff[0]);
+				freezeit.logFmt("更新到Xposed 未知回应[%d]", buff[0]);
 				return;
 			}
 		}
-		freezeit.log("%s() 工作异常, 请确认LSPosed中冻它勾选系统框架, 然后重启 sendLen[%lu]", __FUNCTION__,
+		freezeit.logFmt("%s() 工作异常, 请确认LSPosed中冻它勾选系统框架, 然后重启 sendLen[%lu]", __FUNCTION__,
 			tmp.length());
 	}
 
@@ -788,21 +792,21 @@ public:
 		ifstream file(labelPath);
 
 		if (!file.is_open()) {
-			freezeit.log("读取应用名称文件失败: [%s]", labelPath.c_str());
+			freezeit.logFmt("读取应用名称文件失败: [%s]", labelPath.c_str());
 			return;
 		}
 
 		string line;
 		while (getline(file, line)) {
 			if (line.length() <= 2) {
-				freezeit.log("读取到错误包名: [%s]", line.c_str());
+				freezeit.logFmt("读取到错误包名: [%s]", line.c_str());
 				continue;
 			}
 
 			if (isalpha(line[0])) {// package####label
 				auto value = Utils::splitString(line, "####");
 				if (value.size() != 2) {
-					freezeit.log("分割错误: [%s]", line.c_str());
+					freezeit.logFmt("分割错误: [%s]", line.c_str());
 					continue;
 				}
 				auto it = uidIndex.find(value[0]);
@@ -817,7 +821,7 @@ public:
 					it->second.label = line.substr(6);
 			}
 			else {
-				freezeit.log("读取到错误包名: [%s]", line.c_str());
+				freezeit.logFmt("读取到错误包名: [%s]", line.c_str());
 				continue;
 			}
 		}
@@ -835,7 +839,7 @@ public:
 	void saveLabel() {
 		auto fd = open(labelPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
 		if (fd < 0) {
-			freezeit.log("保存应用名称文件失败: [%s]", labelPath.c_str());
+			freezeit.logFmt("保存应用名称文件失败: [%s]", labelPath.c_str());
 			return;
 		}
 
@@ -852,45 +856,4 @@ public:
 		close(fd);
 	}
 
-
-	[[maybe_unused]] void print() {
-		string tmp, logContent{ "当前配置:" };
-
-		tmp.clear();
-		for (const auto& [uid, info] : infoMap) {
-			if (info.freezeMode == FREEZE_MODE::TERMINATE)
-				tmp += info.label + " ";
-		}
-		if (tmp.length())logContent += "\n\n杀死后台: " + tmp;
-
-		tmp.clear();
-		for (const auto& [uid, info] : infoMap) {
-			if (info.freezeMode == FREEZE_MODE::SIGNAL)
-				tmp += info.label + " ";
-		}
-		if (tmp.length())logContent += "\n\nSIGSTOP冻结: " + tmp;
-
-		tmp.clear();
-		for (const auto& [uid, info] : infoMap) {
-			if (info.freezeMode == FREEZE_MODE::FREEZER)
-				tmp += info.label + " ";
-		}
-		if (tmp.length())logContent += "\n\nFreezer冻结: " + tmp;
-
-		tmp.clear();
-		for (const auto& [uid, info] : infoMap) {
-			if (info.freezeMode == FREEZE_MODE::WHITELIST)
-				tmp += info.label + " ";
-		}
-		if (tmp.length())logContent += "\n\n自由后台: " + tmp;
-
-		tmp.clear();
-		for (const auto& [uid, info] : infoMap) {
-			if (info.freezeMode == FREEZE_MODE::WHITEFORCE)
-				tmp += info.label + " ";
-		}
-		if (tmp.length())logContent += "\n\n自由后台(内置): " + tmp;
-
-		freezeit.log(logContent + "\n");
-	}
 };
