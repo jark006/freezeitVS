@@ -18,7 +18,7 @@ private:
 	unique_ptr<char[]> packageListBuff;
 
 	string homePackage;
-	map<int, appInfoStruct> infoMap;
+	appInfoStruct infoMap[2000];
 	map<string, int> uidIndex;
 	map<int, cfgStruct> cfgTemp;
 
@@ -33,6 +33,9 @@ private:
 			"com.xiaomi.account",                   // 小米账号
 			"com.miui.notes",                       // 笔记  冻结会导致系统侧边栏卡住
 			"com.miui.mediaeditor",                 // 相册编辑
+			"com.miui.personalassistant",           // 个人助理
+			"com.miui.vipservice",                  // 我的服务
+			"com.miui.systemAdSolution",            // 智能助理 广告相关 冻结会导致酷安等应用卡顿
 			"com.mfashiongallery.emag",             // 小米画报
 			"com.huawei.hwid",                      // HMS core服务
 
@@ -361,7 +364,7 @@ private:
 		// "com.google.android.gms",               // GMS 服务
 		// "com.google.android.gsf",               // Google 服务框架
 		"com.mi.health",                        // 小米运动健康
-		"com.tencent.mm.wxa.sce",               // 微信小程序
+		"com.tencent.mm.wxa.sce",               // 微信小程序   三星OneUI专用
 
 		"com.onlyone.onlyonestarter",           // 三星系应用
 		"com.samsung.accessory.neobeanmgr",     // Galaxy Buds Live Manager
@@ -400,25 +403,16 @@ public:
 
 	auto& getRaw() { return infoMap; }
 
-	auto& operator[](const int uid) { return infoMap[uid]; }
+	auto& operator[](const int uid) { return infoMap[uid - 10000]; }
+	auto& operator[](const string& package) { return infoMap[uidIndex[package] - 10000]; }
 
-	auto& operator[](const string& package) { return infoMap[uidIndex[package]]; }
+	void clear() { for (auto& info : infoMap) info.uid = -1; }
 
-	size_t erase(const int uid) { return infoMap.erase(uid); }
+	bool contains(const int uid) const { return 10000 <= uid && uid < 12000 && infoMap[uid - 10000].uid == uid; }
 
-	size_t size() { return infoMap.size(); }
+	bool contains(const string& package) const { return uidIndex.contains(package); }
 
-	void clear() { infoMap.clear(); }
-
-	bool contains(const int uid) { return infoMap.contains(uid); }
-
-	bool contains(const string& package) { return uidIndex.contains(package); }
-
-	bool without(const int uid) { return !infoMap.contains(uid); }
-
-	bool without(const string& package) { return !uidIndex.contains(package); }
-
-	auto& getLabel(const int uid) { return infoMap[uid].label; }
+	auto& getLabel(const int uid) { return infoMap[uid - 10000].label; }
 
 	int getUid(const string& package) { return uidIndex[package]; }
 
@@ -427,7 +421,7 @@ public:
 		return it != uidIndex.end() ? it->second : defaultValue;
 	}
 
-	bool hasHomePackage() { return homePackage.length() > 2; }
+	bool hasHomePackage() const { return homePackage.length() > 2; }
 
 	void updateHomePackage(const string& package) {
 		homePackage = package;
@@ -438,7 +432,7 @@ public:
 		}
 
 		const int uid = it->second;
-		infoMap[uid].freezeMode = FREEZE_MODE::WHITEFORCE;
+		infoMap[uid - 10000].freezeMode = FREEZE_MODE::WHITEFORCE;
 	}
 
 	bool readPackagesListA12(map<int, string>& _allAppList, map<int, string>& _thirdAppList) {
@@ -556,7 +550,7 @@ public:
 			return;
 		}
 		else {
-			freezeit.logFmt("刷新应用 %lu  系统[%lu] 三方[%lu]",
+			freezeit.logFmt("更新应用 %lu  系统:%lu 三方:%lu",
 				allAppList.size(), allAppList.size() - thirdAppList.size(),
 				thirdAppList.size());
 		}
@@ -564,27 +558,31 @@ public:
 		uidIndex.clear();
 		for (const auto& [uid, package] : allAppList) {
 			uidIndex[package] = uid;        // 更新 按包名取UID
-			if (infoMap.contains(uid))continue;
+			if (contains(uid))continue;
 
 			const bool isSYS = !thirdAppList.contains(uid);
-			infoMap[uid] = {
-					isSYS ? FREEZE_MODE::WHITELIST : FREEZE_MODE::FREEZER, //freezeMode
-					true,    // isTolerant
-					0,       // failFreezeCnt
-					isSYS,   // isSystemApp
-					0,       // startRunningTime
-					0,       // stopRunningTime
-					0,       // totalRunningTime
-					package, // package
-					package, // label
-					{}
-			};
-		}
+			auto& info = infoMap[uid - 10000];
 
+			info.uid = uid;
+			info.freezeMode = isSYS ? FREEZE_MODE::WHITELIST : FREEZE_MODE::FREEZER;
+			info.isTolerant = true;
+			info.failFreezeCnt = 0;
+			info.isSystemApp = isSYS;
+			info.startRunningTime = 0;
+			info.stopRunningTime = 0;
+			info.totalRunningTime = 0;
+			info.package = package;
+			info.label = package;
+			info.pids.clear();
+		}
 		// 移除已卸载应用
-		for (auto it = infoMap.begin(); it != infoMap.end();) {
-			if (allAppList.contains(it->first))it++;
-			else it = infoMap.erase(it);
+		for (auto& info : infoMap) {
+			if (info.uid < 0 || allAppList.contains(info.uid))continue;
+
+			info.uid = -1;
+			info.package.clear();
+			info.label.clear();
+			info.pids.clear();
 		}
 		END_TIME_COUNT;
 	}
@@ -678,20 +676,24 @@ public:
 	}
 
 	void applyCfgTemp() {
-		for (auto& [uid, info] : infoMap) {
+		for (auto& info : infoMap) {
+			if (info.uid < 0)continue;
+
 			if (isSystemApp(info.package.c_str()) || whiteListDefault.contains(info.package))
 				info.freezeMode = FREEZE_MODE::WHITELIST;
 		}
 
 		for (const auto& [uid, cfg] : cfgTemp) {
-			auto it = infoMap.find(uid);
-			if (it == infoMap.end()) continue;
-
-			it->second.freezeMode = cfg.freezeMode;
-			it->second.isTolerant = cfg.isTolerant;
+			if (contains(uid)) {
+				auto& info = infoMap[uid - 10000];
+				info.freezeMode = cfg.freezeMode;
+				info.isTolerant = cfg.isTolerant;
+			}
 		}
 
-		for (auto& [uid, info] : infoMap) {
+		for (auto& info : infoMap) {
+			if (info.uid < 0)continue;
+
 			if (whiteListForce.contains(info.package))
 				info.freezeMode = FREEZE_MODE::WHITEFORCE;
 		}
@@ -699,23 +701,24 @@ public:
 		if (homePackage.length() > 3) {
 			auto it = uidIndex.find(homePackage);
 			if (it != uidIndex.end())
-				infoMap[it->second].freezeMode = FREEZE_MODE::WHITEFORCE;
+				infoMap[it->second - 10000].freezeMode = FREEZE_MODE::WHITEFORCE;
 		}
 	}
 
 	void saveConfig() {
 		stackString<1024 * 64> tmp;
-		for (const auto& [uid, cfg] : infoMap)
-			if (cfg.freezeMode < FREEZE_MODE::WHITEFORCE)
-				tmp.appendFmt("%s %d %d\n",
-					cfg.package.c_str(),
-					static_cast<int>(cfg.freezeMode),
-					cfg.isTolerant ? 1 : 0);
+		for (const auto& info : infoMap) {
+			if (info.uid < 0)continue;
 
-		if (Utils::writeString(cfgPath.c_str(), *tmp, tmp.length))
-			freezeit.log("保存配置成功");
-		else
-			freezeit.logFmt("保存配置文件失败: [%s]", cfgPath.c_str());
+			if (info.freezeMode < FREEZE_MODE::WHITEFORCE)
+				tmp.appendFmt("%s %d %d\n",
+					info.package.c_str(),
+					static_cast<int>(info.freezeMode),
+					info.isTolerant ? 1 : 0);
+		}
+
+		freezeit.log(Utils::writeString(cfgPath.c_str(), *tmp, tmp.length) ?
+			"配置保存成功" : "⚠️配置保存失败⚠️");
 	}
 
 	void update2xposedByLocalSocket() {
@@ -733,16 +736,17 @@ public:
 		tmp += '\n';
 
 		vector<int> tolerantUids;
-		for (auto& [uid, info] : infoMap) {
-			if (info.isWhitelist())
-				continue;
+		for (const auto& info : infoMap) {
+			if (info.uid < 0)continue;
 
-			tmp += to_string(uid);
+			if (info.isWhitelist()) continue;
+
+			tmp += to_string(info.uid);
 			tmp += info.package;
 			tmp += ' ';
 
 			if (info.isTolerant)
-				tolerantUids.emplace_back(uid);
+				tolerantUids.emplace_back(info.uid);
 		}
 		tmp += '\n';
 
@@ -751,11 +755,6 @@ public:
 			tmp += ' ';
 		}
 		tmp += '\n';
-
-		if (tmp.empty()) {
-			freezeit.log("更新到Xposed异常, 无效数据");
-			return;
-		}
 
 		for (int i = 0; i < 3; i++) {
 			int buff[8];
@@ -798,42 +797,28 @@ public:
 
 		string line;
 		while (getline(file, line)) {
-			if (line.length() <= 2) {
-				freezeit.logFmt("读取到错误包名: [%s]", line.c_str());
+			if (line.length() <= 2 || !isalpha(line[0])) {
+				freezeit.logFmt("错误名称: [%s]", line.c_str());
 				continue;
 			}
 
-			if (isalpha(line[0])) {// package####label
-				auto value = Utils::splitString(line, "####");
-				if (value.size() != 2) {
-					freezeit.logFmt("分割错误: [%s]", line.c_str());
-					continue;
-				}
-				auto it = uidIndex.find(value[0]);
-				if (it != uidIndex.end())
-					infoMap[it->second].label = value[1];
-			}
-			else if (isdigit(line[0])) {  // uid label
-				int uid = atoi(line.c_str());
-
-				auto it = infoMap.find(uid);
-				if (it != infoMap.end() && line.length() > 6)
-					it->second.label = line.substr(6);
-			}
-			else {
-				freezeit.logFmt("读取到错误包名: [%s]", line.c_str());
+			// package####label
+			auto splitIdx = line.find("####");
+			if (splitIdx == string::npos) {
+				freezeit.logFmt("错误分割符: [%s]", line.c_str());
 				continue;
 			}
+			auto it = uidIndex.find(line.substr(0, splitIdx));
+			if (it != uidIndex.end() && contains(it->second))
+				infoMap[it->second - 10000].label = line.substr(splitIdx + 4);
 		}
 		file.close();
 	}
 
 	void loadLabel(const map<int, string>& labelList) {
-		for (auto& [uid, label] : labelList) {
-			auto it = infoMap.find(uid);
-			if (it != infoMap.end())
-				it->second.label = label;
-		}
+		for (auto& [uid, label] : labelList)
+			if (contains(uid))
+				infoMap[uid - 10000].label = label;
 	}
 
 	void saveLabel() {
@@ -845,8 +830,8 @@ public:
 
 		string tmp;
 		tmp.reserve(1024L * 16);
-		for (const auto& [uid, info] : infoMap)
-			if (info.package != info.label) {
+		for (const auto& info : infoMap)
+			if (info.uid > 0 && info.package != info.label) {
 				tmp += info.package;
 				tmp += "####";
 				tmp += info.label;

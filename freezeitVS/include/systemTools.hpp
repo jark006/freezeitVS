@@ -11,32 +11,18 @@ private:
 
 	thread sndThread;
 
-	constexpr static uint32_t CPU0S = 0XFF22BB44; // efficiency
-	constexpr static uint32_t CPU1S = 0XFF22BB22;
-	constexpr static uint32_t CPU2S = 0XFF44BB22;
-	constexpr static uint32_t CPU3S = 0XFF66BB22;
-	constexpr static uint32_t CPU4S = 0XFF44BB22;
-	constexpr static uint32_t CPU5S = 0XFF66BB22;
+	constexpr static uint32_t COLOR_E = 0XFF22BB44; // efficiency
+	constexpr static uint32_t COLOR_M = 0XFFDD6622; // performance
+	constexpr static uint32_t COLOR_P = 0XFF2266BB; // performance+
+	constexpr static uint32_t COLOR_PRIME = 0XFF2238EE; // Prime
 
-	constexpr static uint32_t CPU3M = 0XFFDD6622; // performance
-	constexpr static uint32_t CPU4M = 0XFFDD7722;
-	constexpr static uint32_t CPU5M = 0XFFDD8822;
-	constexpr static uint32_t CPU6M = 0XFFDD9922;
-
-	constexpr static uint32_t CPU5P = 0XFF2266BB; // performance+
-	constexpr static uint32_t CPU6P = 0XFF2288BB;
-
-	constexpr static uint32_t CPU4B = 0XFF2238EE; // Prime
-	constexpr static uint32_t CPU5B = 0XFF2230EE;
-	constexpr static uint32_t CPU6B = 0XFF2228EE;
-	constexpr static uint32_t CPU7B = 0XFF2220EE;
-
-	constexpr static uint32_t COLOR_CLUSTER[5][8] = {
-			{CPU0S, CPU1S, CPU2S, CPU3S, CPU4B, CPU5B, CPU6B, CPU7B}, // 44
-			{CPU0S, CPU1S, CPU2S, CPU3S, CPU4M, CPU5M, CPU6M, CPU7B}, // 431
-			{CPU0S, CPU1S, CPU2S, CPU3S, CPU4M, CPU5M, CPU6B, CPU7B}, // 422
-			{CPU0S, CPU1S, CPU2S, CPU3M, CPU4M, CPU5P, CPU6P, CPU7B}, // 3221
-			{CPU0S, CPU1S, CPU2S, CPU3S, CPU4S, CPU5S, CPU6B, CPU7B}, // 62
+	constexpr static uint32_t COLOR_CLUSTER[6][8] = {
+			{COLOR_E, COLOR_E, COLOR_E, COLOR_E, COLOR_PRIME, COLOR_PRIME, COLOR_PRIME, COLOR_PRIME}, // 44
+			{COLOR_E, COLOR_E, COLOR_E, COLOR_E, COLOR_M, COLOR_M, COLOR_M, COLOR_PRIME}, // 431
+			{COLOR_E, COLOR_E, COLOR_E, COLOR_E, COLOR_M, COLOR_M, COLOR_PRIME, COLOR_PRIME}, // 422
+			{COLOR_E, COLOR_E, COLOR_E, COLOR_M, COLOR_M, COLOR_P, COLOR_P, COLOR_PRIME}, // 3221
+			{COLOR_E, COLOR_E, COLOR_E, COLOR_E, COLOR_E, COLOR_E, COLOR_PRIME, COLOR_PRIME}, // 62
+			{COLOR_E, COLOR_E, COLOR_M, COLOR_M, COLOR_M, COLOR_M, COLOR_M, COLOR_PRIME}, // 251
 	};
 
 public:
@@ -54,7 +40,6 @@ public:
 		int freeSwap = 1;
 	} memInfo;
 
-	bool isSamsung{ false };
 	int cpuTemperature{ 0 };
 	int batteryWatt{ 0 };
 
@@ -74,27 +59,7 @@ public:
 		freezeit(freezeit), settings(settings) {
 
 		getCpuTempPath();
-		bindCluster();
-
-		char res[256];
-		if (__system_property_get("gsm.operator.alpha", res) > 0 && res[0] != ',')
-			freezeit.logFmt("运营信息 %s", res);
-		if (__system_property_get("gsm.network.type", res) > 0) freezeit.logFmt("网络类型 %s", res);
-		if (__system_property_get("ro.product.brand", res) > 0) {
-			freezeit.logFmt("设备厂商 %s", res);
-
-			for (int i = 0; i < 8; i++)res[i] |= 32;
-			//*((uint64_t*)res) |= 0x20202020'20202020ULL;
-			if (!strncmp(res, "samsung", 7))
-				isSamsung = true;
-		}
-		if (__system_property_get("ro.product.marketname", res) > 0) freezeit.logFmt("设备型号 %s", res);
-		if (__system_property_get("persist.sys.device_name", res) > 0) freezeit.logFmt("设备名称 %s", res);
-		if (__system_property_get("ro.system.build.version.incremental", res) > 0)
-			freezeit.logFmt("系统版本 %s", res);
-		if (__system_property_get("ro.soc.manufacturer", res) > 0 &&
-			__system_property_get("ro.soc.model", res + 100) > 0)
-			freezeit.logFmt("硬件平台 %s %s", res, res + 100);
+		InitCPU();
 
 		InitLMK();
 
@@ -244,7 +209,7 @@ public:
 		else {
 			current /= 1000; // uA -> mA
 		}
-		return (voltage * current) / (isSamsung ? 1000 : -1000);
+		return (voltage * current) / (freezeit.isSamsung ? 1000 : -1000);
 	}
 
 	void checkBattery() {
@@ -317,7 +282,7 @@ public:
 	}
 
 
-	void bindCluster() {
+	void InitCPU() {
 
 		const auto res = getCpuCluster();
 		cpuCluster = 0;
@@ -344,6 +309,9 @@ public:
 		case 62:
 			COLOR_CPU = COLOR_CLUSTER[4];
 			break;
+		case 251:
+			COLOR_CPU = COLOR_CLUSTER[5];
+			break;
 		}
 
 		cpuCoreAll = sysconf(_SC_NPROCESSORS_CONF);
@@ -366,67 +334,6 @@ public:
 		if (cpuCoreValid > 16) {
 			cpuCoreValid = 16;
 			freezeit.log("核心数量超过16, 部分功能可能不受支持");
-		}
-
-		cpu_set_t mask;
-		CPU_ZERO(&mask);
-
-		switch (settings.clusterBind) {
-		case 0:
-		default:
-			CPU_SET(0, &mask);
-			CPU_SET(1, &mask);
-			CPU_SET(2, &mask);
-			CPU_SET(3, &mask);
-			break;
-		case 1:
-			CPU_SET(0, &mask);
-			CPU_SET(1, &mask);
-			CPU_SET(2, &mask);
-			break;
-		case 2:
-			CPU_SET(3, &mask);
-			CPU_SET(4, &mask);
-			break;
-		case 3:
-			CPU_SET(4, &mask);
-			CPU_SET(5, &mask);
-			CPU_SET(6, &mask);
-			break;
-		case 4:
-			CPU_SET(5, &mask);
-			CPU_SET(6, &mask);
-			break;
-		case 5:
-			CPU_SET(7, &mask);
-			break;
-		case 6:
-			CPU_SET(4, &mask);
-			CPU_SET(5, &mask);
-			CPU_SET(6, &mask);
-			CPU_SET(7, &mask);
-			break;
-		}
-
-		stackString<128> tmp("绑定核心 ");
-		tmp.append(settings.getClusterText().c_str());
-		if (sched_setaffinity(0, sizeof(mask), &mask))
-			tmp.append(" 失败:").append(strerror(errno));
-
-		freezeit.log(tmp.c_str());
-		usleep(1000);
-
-		CPU_ZERO(&mask);
-		if (sched_getaffinity(0, sizeof(mask), &mask) == 0) {
-			stackString<128> tips("所在核心");
-			for (int i = 0; i < cpuCoreAll; i++) {
-				if (CPU_ISSET(i, &mask))
-					tips.append(" [", 2).append(i).append("]", 1);
-			}
-			freezeit.log(tips.c_str());
-		}
-		else {
-			freezeit.logFmt("获取当前所在核心失败, ERROR [%d]:[%s]", errno, strerror(errno));
 		}
 	}
 

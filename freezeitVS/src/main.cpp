@@ -6,10 +6,6 @@
  * 
  * 主线程8MiB  子线程 栈深约 1016Kib
  * 
- * 在左下角 Build Variants 选择 Release
- * 在任意 cpp头文件或源码文件中，菜单 Build -> Recompile "xxx"
- * 编译输出 module\\build\intermediates\cmake\release\obj\arm64-v8a
- * 
  */
 
 #include "freezeit.hpp"
@@ -20,22 +16,23 @@
 #include "freezer.hpp"
 #include "server.hpp"
 
-#define TEST_CODE 0
+const int TEST_CODE = 0;
 
-#if TEST_CODE
 void test();
-#endif
 
 int main(int argc, char **argv) {
-#if TEST_CODE
-    test();
-#else
-    char tmp[1024];
-    string fullPath(realpath(argv[0], tmp));
+
+    if (TEST_CODE) {
+        test();
+        exit(0);
+    }
+
+    char fullPath[1024] = {};
+    auto pathPtr = realpath(argv[0], fullPath); //先获取模块目录，下面Init开启守护线程后就不能获取了
 
     Utils::Init();
 
-    Freezeit freezeit(argc, move(fullPath));
+    Freezeit freezeit(argc, string(pathPtr));
     Settings settings(freezeit);
     ManagedApp managedApp(freezeit, settings);
     SystemTools systemTools(freezeit, settings);
@@ -43,28 +40,14 @@ int main(int argc, char **argv) {
     Freezer freezer(freezeit, settings, managedApp, systemTools, doze);
     Server server(freezeit, settings, managedApp, systemTools, doze, freezer);
 
-    // 184744
-    constexpr int size = sizeof(Freezeit) + sizeof(Settings) + sizeof(ManagedApp) + sizeof(SystemTools)
-        + sizeof(Doze) + sizeof(Freezer) + sizeof(Server);
+    // 424720 Bytes
+    //constexpr int size = sizeof(Freezeit) + sizeof(Settings) + sizeof(ManagedApp) + sizeof(SystemTools)
+    //    + sizeof(Doze) + sizeof(Freezer) + sizeof(Server);
 
     sleep(3600 * 24 * 365);//放年假
-#endif
     return 0;
 }
 
-#if TEST_CODE
-
-void pp(const char* s) {
-    printf("pp[%s]\n", s);
-}
-
 void test() {
-    char tmp[1024] = {};
-    scanf("%s", tmp);
-    printf("Before\n");
-    pp(Utils::bin2Hex(tmp, strlen(tmp)).c_str());
-    printf("End\n");
+    printf("Test2\n");
 }
-
-
-#endif

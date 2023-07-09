@@ -69,8 +69,6 @@ public:
 
 		constexpr socklen_t addrLen = sizeof(sockaddr);
 		const sockaddr_in serv_addr{ AF_INET, htons(60613), {inet_addr("127.0.0.1")}, {} };
-		sockaddr_in clnt_addr{};
-		socklen_t clnt_addr_size = sizeof(sockaddr_in);
 
 
 		recvBuf = make_unique<char[]>(RECV_BUF_SIZE);
@@ -120,12 +118,14 @@ public:
 				continue;
 			}
 
-			if (listen(serv_sock, 64) < 0) {
+			if (listen(serv_sock, 4) < 0) {
 				fprintf(stderr, "listen() Fail, [%d]:[%s]", errno, strerror(errno));
 				continue;
 			}
 
 			while (true) {
+				sockaddr_in clnt_addr{};
+				socklen_t clnt_addr_size = sizeof(sockaddr_in);
 				int clnt_sock = accept(serv_sock, (sockaddr*)&clnt_addr, &clnt_addr_size);
 				if (clnt_sock < 0) {
 					static int failCnt = 1;
@@ -176,8 +176,8 @@ public:
 				if (recvLen) {
 					uint32_t lenTmp = recv(clnt_sock, recvBuf.get(), recvLen, MSG_WAITALL);
 					if (lenTmp != recvLen) {
-						fprintf(stderr, "附带数据接收错误, appCommand[%u], 要求[%u], 实际接收[%u]", appCommand,
-							recvLen, lenTmp);
+						fprintf(stderr, "附带数据接收错误, appCommand[%u], 要求[%u], 实际接收[%u]", 
+							appCommand,	recvLen, lenTmp);
 						close(clnt_sock);
 						continue;
 					}
@@ -187,8 +187,7 @@ public:
 						XOR_cal ^= (uint8_t)recvBuf[i];
 
 					if (XOR_value != XOR_cal) {
-						fprintf(stderr, "%s() 数据校验错误, 提供值[0x%2x], 接收数据计算值[0x%2x]", __FUNCTION__,
-							XOR_value, XOR_cal);
+						fprintf(stderr, "数据校验错误, 提供值[0x%2x], 接收数据计算值[0x%2x]", XOR_value, XOR_cal);
 						close(clnt_sock);
 						continue;
 					}
@@ -224,8 +223,10 @@ public:
 		case cmdEnum::getAppCfg: {
 			uint32_t intLen = 0;
 			const auto ptr = reinterpret_cast<int*>(replyBuf.get());
-			for (const auto& [uid, info] : managedApp.getRaw()) {
-				ptr[intLen++] = uid;
+			for (const auto& info : managedApp.getRaw()) {
+				if (info.uid < 0)continue;
+
+				ptr[intLen++] = info.uid;
 				ptr[intLen++] = static_cast<int>(info.freezeMode);
 				ptr[intLen++] = info.isTolerant ? 1 : 0;
 			}
@@ -271,12 +272,37 @@ public:
 				int lastTotal;
 			};
 			vector<st> uidTimeSort;
-			uidTimeSort.reserve(128);
+			uidTimeSort.reserve(256);
+
+			/* 按总时间排序 ***********************************************/
+
 			for (const auto& [uid, timeList] : doze.updateUidTime())
 				uidTimeSort.emplace_back(st{ uid, timeList.total, timeList.lastTotal });
-
 			std::sort(uidTimeSort.begin(), uidTimeSort.end(),
 				[](const st& a, const st& b) { return a.total > b.total; });
+
+
+			/* 先按跳动时间排序，再按总时间排序。跳动太大，不好查看 *********/
+
+			//for (const auto& [uid, timeList] : doze.updateUidTime())
+			//	if (timeList.total != timeList.lastTotal)
+			//		uidTimeSort.emplace_back(st{ uid, timeList.total, timeList.lastTotal });
+
+			//const auto size = uidTimeSort.size();
+
+			//for (const auto& [uid, timeList] : doze.updateUidTime())
+			//	if (timeList.total == timeList.lastTotal)
+			//		uidTimeSort.emplace_back(st{ uid, timeList.total, timeList.lastTotal });
+
+			//if (size)
+			//	std::sort(uidTimeSort.begin(), uidTimeSort.begin() + size,
+			//		[](const st& a, const st& b) { return (a.total - a.lastTotal) > (b.total - b.lastTotal); });
+
+			//std::sort(uidTimeSort.begin() + size, uidTimeSort.end(),
+			//	[](const st& a, const st& b) { return a.total > b.total; });
+
+			/*************************************************************/
+
 
 			for (const auto& [uid, total, lastTotal] : uidTimeSort) {
 				ptr[intLen++] = uid;
@@ -325,14 +351,14 @@ public:
 
 			string tips;
 			set<int> uidSet;
-			for (const auto& [uid, info] : managedApp.getRaw()) {
-				if (info.freezeMode == FREEZE_MODE::WHITEFORCE) continue;
-				if (!newCfg.contains(uid)) continue;
-				if (info.freezeMode == newCfg[uid].freezeMode)continue;
+			for (const auto& info : managedApp.getRaw()) {
+				if (info.uid < 0 || info.freezeMode == FREEZE_MODE::WHITEFORCE ||
+					!newCfg.contains(info.uid) || info.freezeMode == newCfg[info.uid].freezeMode)
+					continue;
 
-				uidSet.insert(uid);
+				uidSet.insert(info.uid);
 				tips += freezer.getModeText(info.freezeMode) + "->" +
-					freezer.getModeText(newCfg[uid].freezeMode) + " [" +
+					freezer.getModeText(newCfg[info.uid].freezeMode) + " [" +
 					info.label + "]\n";
 			}
 			if (tips.length())
@@ -367,7 +393,7 @@ public:
 			for (const string& str : Utils::splitString(string(recvBuf.get(), recvLen),
 				"\n")) {
 				const int uid = atoi(str.c_str());
-				if (managedApp.without(uid) || str.length() <= 6)
+				if (!managedApp.contains(uid) || str.length() <= 6)
 					freezeit.logFmt("解析名称错误 [%s]", str.c_str());
 				else labelList[uid] = str.substr(6);
 			}

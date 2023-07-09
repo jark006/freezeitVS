@@ -47,7 +47,6 @@ private:
 	const char* cpusetEventPathA12 = "/dev/cpuset/top-app/tasks";
 	const char* cpusetEventPathA13 = "/dev/cpuset/top-app/cgroup.procs";
 
-	// const char* cgroupV1UidPath = "/dev/jark_freezer/uid_%d";
 	const char* cgroupV1FrozenPath = "/dev/jark_freezer/frozen/cgroup.procs";
 	const char* cgroupV1UnfrozenPath = "/dev/jark_freezer/unfrozen/cgroup.procs";
 
@@ -148,6 +147,7 @@ public:
 		} break;
 		}
 
+		// 以上手动选择若不支持或失败，下面将进行自动选择
 		if (checkFreezerV2FROZEN()) {
 			workMode = WORK_MODE::V2FROZEN;
 			freezeit.log("Freezer类型已设为 V2(FROZEN)");
@@ -156,18 +156,18 @@ public:
 			workMode = WORK_MODE::V2UID;
 			freezeit.log("Freezer类型已设为 V2(UID)");
 		}
-		else if (mountFreezerV1()) {
-			workMode = WORK_MODE::V1F;
-			freezeit.log("Freezer类型已设为 V1(FROZEN)");
-		}
+		//else if (mountFreezerV1()) { // 部分V1不能内存释放，不再进行自动选择，只能手动选择
+		//	workMode = WORK_MODE::V1F;
+		//	freezeit.log("Freezer类型已设为 V1(FROZEN)");
+		//}
 		else {
 			workMode = WORK_MODE::GLOBAL_SIGSTOP;
-			freezeit.log("不支持任何Freezer, 已开启 [全局SIGSTOP] 冻结模式");
+			freezeit.log("已开启 [全局SIGSTOP] 冻结模式");
 		}
 		freezeit.setWorkMode(workModeStr(workMode));
 	}
 
-	bool isV1Mode() {
+	bool isV1Mode() const {
 		return workMode == WORK_MODE::V1F_ST || workMode == WORK_MODE::V1F;
 	}
 
@@ -376,8 +376,7 @@ public:
 
 		case WORK_MODE::V1F: {
 			for (const int pid : pids) {
-				if (!Utils::writeInt(
-					signal == SIGSTOP ? cgroupV1FrozenPath : cgroupV1UnfrozenPath, pid))
+				if (!Utils::writeInt(signal == SIGSTOP ? cgroupV1FrozenPath : cgroupV1UnfrozenPath, pid))
 					freezeit.logFmt("%s [%s] 失败(V1F) PID:%d", (signal == SIGSTOP ? "冻结" : "解冻"),
 						managedApp[uid].label.c_str(), pid);
 			}
@@ -402,6 +401,36 @@ public:
 				snprintf(path, sizeof(path), "/proc/%d", pid);
 				return access(path, F_OK);
 				});
+
+			// TODO
+			if (info.package.starts_with("com.tencent.mobileqq") && info.stopRunningTime &&
+				(time(nullptr) - info.stopRunningTime > 300)) {
+				for (const auto pid : info.pids) {
+					char tmp[256];
+					char path[32];
+					snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
+					Utils::readString(path, tmp, sizeof(tmp));
+					if (!strncmp(tmp + 20, ":MSF", 4)) {
+						kill(pid, SIGKILL);
+						freezeit.logFmt("终结 QQ:MSF PID:%d", pid);
+						break;
+					}
+				}
+			}
+			else if (info.package.starts_with("com.tencent.mm") && info.stopRunningTime &&
+				(time(nullptr) - info.stopRunningTime > 300)) {
+				for (const auto pid : info.pids) {
+					char tmp[256];
+					char path[32];
+					snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
+					Utils::readString(path, tmp, sizeof(tmp));
+					if (!strncmp(tmp + 14, ":push", 4)) {
+						kill(pid, SIGKILL);
+						freezeit.logFmt("终结 微信:push PID:%d", pid);
+						break;
+					}
+				}
+			}
 		}
 		else {
 			freezeit.logFmt("错误执行 %s %d", info.label.c_str(), signal);
@@ -449,7 +478,7 @@ public:
 				unfrozenTimeline[it->second] = 0;
 
 			// 冻结就需要在 解冻时间线 插入下一次解冻的时间
-			if (signal == SIGSTOP && info.pids.size() && info.needFreezer()) {
+			if (signal == SIGSTOP && info.pids.size() && info.isSignalOrFreezer()) {
 				uint32_t nextIdx = (timelineIdx + settings.wakeupTimeoutMin * 60) & 0x0FFF; // [ %4096]
 				unfrozenIdx[uid] = nextIdx;
 				unfrozenTimeline[nextIdx] = uid;
@@ -498,15 +527,14 @@ public:
 			return;
 		}
 
-		auto now = time(nullptr);
-		vector<int> pushPids;
+		//auto now = time(nullptr);
 
 		struct dirent* file;
 		while ((file = readdir(dir)) != nullptr) {
 			if (file->d_type != DT_DIR) continue;
 			if (file->d_name[0] < '0' || file->d_name[0] > '9') continue;
 
-			int pid = atoi(file->d_name);
+			const int pid = atoi(file->d_name);
 			if (pid <= 100) continue;
 
 			char fullPath[64];
@@ -516,7 +544,7 @@ public:
 			struct stat statBuf;
 			if (stat(fullPath, &statBuf))continue;
 			const int uid = statBuf.st_uid;
-			if (managedApp.without(uid)) continue;
+			if (!managedApp.contains(uid)) continue;
 
 			auto& info = managedApp[uid];
 			if (info.isWhitelist() || pendingHandleList.contains(uid) || curForegroundApp.contains(uid))
@@ -526,11 +554,18 @@ public:
 			char readBuff[256];
 			if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
 			if (strncmp(readBuff, info.package.c_str(), info.package.length())) continue;
-
-			if ((!strncmp(readBuff, "com.tencent.mobileqq:MSF", 24) || !strncmp(readBuff, "com.tencent.mm:push", 20))
-				&& info.needBreakNetwork() && (now - info.stopRunningTime > 300)) {
-				pushPids.emplace_back(pid);
-			}
+			
+			// TODO
+			//if (!strncmp(readBuff, "com.tencent.mobileqq:MSF", 24)
+			//	|| !strncmp(readBuff, "com.tencent.mm:push", 20)) {
+			//	const int timeDelta = now - info.stopRunningTime;
+			//	if (timeDelta > 300) {
+			//		freezeit.logFmt("终结进程 PID:%d [%s]", pid, readBuff);
+			//		if (isV1Mode() && info.isFreezeMode())
+			//			Utils::writeInt(cgroupV1UnfrozenPath, pid);
+			//		kill(pid, SIGKILL);
+			//	}
+			//}
 
 			switch (info.freezeMode) {
 			case FREEZE_MODE::TERMINATE:
@@ -553,11 +588,11 @@ public:
 
 		//vector<int> breakList;
 		stackString<1024> tmp;
-		for (const auto& [uid, pids] : freezerList) {
+		for (auto& [uid, pids] : freezerList) {
 			auto& info = managedApp[uid];
 			tmp.append(" ", 1).append(info.label.c_str(), (int)info.label.length());
 			handleFreezer(uid, pids, SIGSTOP);
-			managedApp[uid].pids = move(pids);
+			info.pids = move(pids);
 
 			//if (info.needBreakNetwork())
 			//	breakList.emplace_back(uid);
@@ -569,7 +604,7 @@ public:
 			auto& info = managedApp[uid];
 			tmp.append(" ", 1).append(info.label.c_str(), (int)info.label.length());
 			handleSignal(uid, pids, SIGSTOP);
-			managedApp[uid].pids = move(pids);
+			info.pids = move(pids);
 
 			//if (info.needBreakNetwork())
 			//	breakList.emplace_back(uid);
@@ -577,7 +612,7 @@ public:
 		if (tmp.length) freezeit.logFmt("定时SIGSTOP压制: %s", tmp.c_str());
 
 		tmp.clear();
-		for (const auto& [uid, pids] : terminateList) {
+		for (auto& [uid, pids] : terminateList) {
 			auto& label = managedApp[uid].label;
 			tmp.append(" ", 1).append(label.c_str(), (int)label.length());
 			handleSignal(uid, pids, SIGKILL);
@@ -590,9 +625,6 @@ public:
 		//	freezeit.logFmt("定时压制 断网 [%s]", managedApp[uid].label.c_str());
 		//}
 
-		for (const int pid : pushPids)
-			kill(pid, SIGKILL);
-
 		END_TIME_COUNT;
 	}
 
@@ -603,79 +635,21 @@ public:
 		// https://man7.org/linux/man-pages/man7/cgroups.7.html
 		// https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt
 		// https://www.containerlabs.kubedaily.com/LXC/Linux%20Containers/The-cgroup-freezer-subsystem.html
-/*
- def infoEncrypt():
-	bytes1 =\
-	"mkdir /dev/jark_freezer;"\
-	"mount -t cgroup -o freezer freezer /dev/jark_freezer;"\
-	"sleep 1;"\
-	"mkdir -p /dev/jark_freezer/frozen;"\
-	"mkdir -p /dev/jark_freezer/unfrozen;"\
-	"sleep 1;"\
-	"echo FROZEN > /dev/jark_freezer/frozen/freezer.state;"\
-	"echo THAWED > /dev/jark_freezer/unfrozen/freezer.state;"\
-	"echo 1 > /dev/jark_freezer/notify_on_release;"\
-	"sleep 1;".encode('utf-8')
-	bytes2 = bytes(b^0x91 for b in bytes1)
-	print('uint8_t tipsFormat[{}] = {{  //  ^0x91'.format(len(bytes2)+1), end='')
-	cnt = 0
-	for byte in bytes2:
-		if cnt % 16 == 0:
-			print('\n    ', end='')
-		cnt += 1
-		print("0x%02x, " % byte, end='')
-	print('\n    0x91,  //特殊结束符\n};')
-	bytes3 = bytes(b ^ 0x91 for b in bytes2)
-	print('[', bytes3.decode('utf-8'), ']')
-infoEncrypt()
-*/
-		uint8_t cmd[] = {  //  ^0x91
-				0xfc, 0xfa, 0xf5, 0xf8, 0xe3, 0xb1, 0xbe, 0xf5, 0xf4, 0xe7, 0xbe, 0xfb, 0xf0, 0xe3,
-				0xfa, 0xce,
-				0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4, 0xe3, 0xaa, 0xfc, 0xfe, 0xe4, 0xff, 0xe5, 0xb1,
-				0xbc, 0xe5,
-				0xb1, 0xf2, 0xf6, 0xe3, 0xfe, 0xe4, 0xe1, 0xb1, 0xbc, 0xfe, 0xb1, 0xf7, 0xe3, 0xf4,
-				0xf4, 0xeb,
-				0xf4, 0xe3, 0xb1, 0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4, 0xe3, 0xb1, 0xbe, 0xf5, 0xf4,
-				0xe7, 0xbe,
-				0xfb, 0xf0, 0xe3, 0xfa, 0xce, 0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4, 0xe3, 0xaa, 0xe2,
-				0xfd, 0xf4,
-				0xf4, 0xe1, 0xb1, 0xa0, 0xaa, 0xfc, 0xfa, 0xf5, 0xf8, 0xe3, 0xb1, 0xbc, 0xe1, 0xb1,
-				0xbe, 0xf5,
-				0xf4, 0xe7, 0xbe, 0xfb, 0xf0, 0xe3, 0xfa, 0xce, 0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4,
-				0xe3, 0xbe,
-				0xf7, 0xe3, 0xfe, 0xeb, 0xf4, 0xff, 0xaa, 0xfc, 0xfa, 0xf5, 0xf8, 0xe3, 0xb1, 0xbc,
-				0xe1, 0xb1,
-				0xbe, 0xf5, 0xf4, 0xe7, 0xbe, 0xfb, 0xf0, 0xe3, 0xfa, 0xce, 0xf7, 0xe3, 0xf4, 0xf4,
-				0xeb, 0xf4,
-				0xe3, 0xbe, 0xe4, 0xff, 0xf7, 0xe3, 0xfe, 0xeb, 0xf4, 0xff, 0xaa, 0xe2, 0xfd, 0xf4,
-				0xf4, 0xe1,
-				0xb1, 0xa0, 0xaa, 0xf4, 0xf2, 0xf9, 0xfe, 0xb1, 0xd7, 0xc3, 0xde, 0xcb, 0xd4, 0xdf,
-				0xb1, 0xaf,
-				0xb1, 0xbe, 0xf5, 0xf4, 0xe7, 0xbe, 0xfb, 0xf0, 0xe3, 0xfa, 0xce, 0xf7, 0xe3, 0xf4,
-				0xf4, 0xeb,
-				0xf4, 0xe3, 0xbe, 0xf7, 0xe3, 0xfe, 0xeb, 0xf4, 0xff, 0xbe, 0xf7, 0xe3, 0xf4, 0xf4,
-				0xeb, 0xf4,
-				0xe3, 0xbf, 0xe2, 0xe5, 0xf0, 0xe5, 0xf4, 0xaa, 0xf4, 0xf2, 0xf9, 0xfe, 0xb1, 0xc5,
-				0xd9, 0xd0,
-				0xc6, 0xd4, 0xd5, 0xb1, 0xaf, 0xb1, 0xbe, 0xf5, 0xf4, 0xe7, 0xbe, 0xfb, 0xf0, 0xe3,
-				0xfa, 0xce,
-				0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4, 0xe3, 0xbe, 0xe4, 0xff, 0xf7, 0xe3, 0xfe, 0xeb,
-				0xf4, 0xff,
-				0xbe, 0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4, 0xe3, 0xbf, 0xe2, 0xe5, 0xf0, 0xe5, 0xf4,
-				0xaa, 0xf4,
-				0xf2, 0xf9, 0xfe, 0xb1, 0xa0, 0xb1, 0xaf, 0xb1, 0xbe, 0xf5, 0xf4, 0xe7, 0xbe, 0xfb,
-				0xf0, 0xe3,
-				0xfa, 0xce, 0xf7, 0xe3, 0xf4, 0xf4, 0xeb, 0xf4, 0xe3, 0xbe, 0xff, 0xfe, 0xe5, 0xf8,
-				0xf7, 0xe8,
-				0xce, 0xfe, 0xff, 0xce, 0xe3, 0xf4, 0xfd, 0xf4, 0xf0, 0xe2, 0xf4, 0xaa, 0xe2, 0xfd,
-				0xf4, 0xf4,
-				0xe1, 0xb1, 0xa0, 0xaa,
-				0x91,  //特殊结束符
-		};
 
-		Utils::myDecode(cmd, sizeof(cmd));
-		system((const char*)cmd);
+		mkdir("/dev/jark_freezer", 0666);
+		mount("freezer", "/dev/jark_freezer", "cgroup", 0, "freezer");
+		usleep(1000 * 100);
+		mkdir("/dev/jark_freezer/frozen", 0666);
+		mkdir("/dev/jark_freezer/unfrozen", 0666);
+		usleep(1000 * 100);
+		Utils::writeString("/dev/jark_freezer/frozen/freezer.state", "FROZEN");
+		Utils::writeString("/dev/jark_freezer/unfrozen/freezer.state", "THAWED");
+
+		// https://www.spinics.net/lists/cgroups/msg24540.html
+		// https://android.googlesource.com/device/google/crosshatch/+/9474191%5E%21/
+		Utils::writeString("/dev/jark_freezer/frozen/freezer.killable", "1"); // 旧版内核不支持
+		usleep(1000 * 100);
+
 		return (!access(cgroupV1FrozenPath, F_OK) && !access(cgroupV1UnfrozenPath, F_OK));
 	}
 
@@ -752,7 +726,7 @@ infoEncrypt()
 			struct stat statBuf;
 			if (stat(fullPath, &statBuf))continue;
 			const int uid = statBuf.st_uid;
-			if (managedApp.without(uid)) continue;
+			if (!managedApp.contains(uid)) continue;
 
 			auto& info = managedApp[uid];
 			if (info.isWhitelist()) continue;
@@ -948,10 +922,10 @@ infoEncrypt()
 
 		unfrozenTimeline[timelineIdx] = 0;//清掉时间线当前位置UID信息
 
-		if (managedApp.without(uid)) return;
+		if (!managedApp.contains(uid)) return;
 
 		auto& info = managedApp[uid];
-		if (info.needFreezer()) {
+		if (info.isSignalOrFreezer()) {
 			const int num = handleProcess(info, uid, SIGCONT);
 			if (num > 0) {
 				info.startRunningTime = time(nullptr);
@@ -1002,7 +976,7 @@ infoEncrypt()
 			if (startIdx == string::npos || endIdx == string::npos || startIdx > endIdx) continue;
 
 			const string& package = line.substr(startIdx + 1, endIdx - (startIdx + 1));
-			if (managedApp.without(package)) continue;
+			if (!managedApp.contains(package)) continue;
 			int uid = managedApp.getUid(package);
 			if (managedApp[uid].isWhitelist()) continue;
 			curForegroundApp.insert(uid);
@@ -1045,7 +1019,7 @@ infoEncrypt()
 				sscanf(line.c_str(), "%d %d", &uid, &level);
 				if (level < 2 || 6 < level) continue;
 
-				if (managedApp.without(uid))continue;
+				if (!managedApp.contains(uid))continue;
 				if (managedApp[uid].isWhitelist())continue;
 				if ((level <= 3) || managedApp[uid].isTolerant) cur.insert(uid);
 #if DEBUG_DURATION
@@ -1126,7 +1100,7 @@ infoEncrypt()
 					ptr = strstr(line.c_str(), "/u0a");
 					if (!ptr)continue;
 					int uid = 10000 + atoi(ptr + 4);
-					if (managedApp.without(uid))continue;
+					if (!managedApp.contains(uid))continue;
 					if (managedApp[uid].isWhitelist())continue;
 					if ((level <= 3) || managedApp[uid].isTolerant) cur.insert(uid);
 
@@ -1271,7 +1245,7 @@ infoEncrypt()
 		freezeit.log("已退出监控同步事件: 0xB0");
 	}
 
-	[[noreturn]] void cycleThreadFunc() {
+	void cycleThreadFunc() {
 		uint32_t halfSecondCnt{ 0 };
 
 		sleep(1);
@@ -1343,7 +1317,7 @@ infoEncrypt()
 			if (file->d_type != DT_DIR) continue;
 			if (file->d_name[0] < '0' || file->d_name[0] > '9') continue;
 
-			int pid = atoi(file->d_name);
+			const int pid = atoi(file->d_name);
 			if (pid <= 100) continue;
 
 			char fullPath[64];
@@ -1444,10 +1418,29 @@ infoEncrypt()
 
 		START_TIME_COUNT;
 		struct binder_freeze_info info { 0, static_cast<uint32_t>(signal == SIGSTOP ? 1 : 0), 100 };
-		for (const int pid : pids) {
-			info.pid = pid;
-			if (ioctl(bs.fd, BINDER_FREEZE, &info) < 0 && signal == SIGSTOP) {
-				return -pid;
+		//for (const int pid : pids) {
+		//	info.pid = pid;
+		//	if (ioctl(bs.fd, BINDER_FREEZE, &info) < 0 && signal == SIGSTOP) {
+		//		return -pid;
+		//	}
+		//}
+		for (size_t i = 0; i < pids.size(); i++) {
+			info.pid = pids[i];
+			if (ioctl(bs.fd, BINDER_FREEZE, &info) < 0) {
+				if (signal == SIGSTOP) {
+					// 冻结错误，解冻已经被冻结binder的进程
+					info.enable = 0;
+					for (size_t j = 0; j < i; j++) {
+						info.pid = pids[j];
+						ioctl(bs.fd, BINDER_FREEZE, &info); //todo 如果解冻失败？
+					}
+					return -pids[i];
+				}
+				else {
+					usleep(1000 * 10);
+					//todo 再解冻一次，若失败，考虑杀死？
+					ioctl(bs.fd, BINDER_FREEZE, &info);
+				}
 			}
 		}
 		END_TIME_COUNT;

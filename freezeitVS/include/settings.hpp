@@ -28,7 +28,7 @@ private:
 			1,  //[13] 电池监控
 			0,  //[14] 电流校准
 			0,  //[15] QQ/TIM冻结断网
-			1,  //[16] 调整 lmk 参数 仅安卓11-15
+			0,  //[16] 调整 lmk 参数 仅安卓11-15
 			1,  //[17] 深度Doze
 			0,  //[18] 扩展前台
 			1,  //[19]
@@ -49,7 +49,7 @@ private:
 
 public:
 	uint8_t& settingsVer = settingsVar[0];       // 设置文件版本
-	uint8_t& clusterBind = settingsVar[1];       // 绑定到 CPU簇 0-6
+	//uint8_t& unknown = settingsVar[1];       // 
 	uint8_t& freezeTimeout = settingsVar[2];     // 单位 秒
 	uint8_t& wakeupTimeoutMin = settingsVar[3];  // 单位 分
 	uint8_t& terminateTimeout = settingsVar[4];  // 单位 秒
@@ -58,9 +58,10 @@ public:
 
 	uint8_t& enableBatteryMonitor = settingsVar[13];   // 电池监控
 	uint8_t& enableCurrentFix = settingsVar[14];       // 电池电流校准
-	//uint8_t& enableBreakNetwork = settingsVar[15];     // QQ/TIM冻结断网
+	//uint8_t& enableBreakNetwork = settingsVar[15];     // 
 	uint8_t& enableLMK = settingsVar[16];              // 调整 lmk 参数 仅安卓11-15
 	uint8_t& enableDoze = settingsVar[17];             // 深度Doze
+	uint8_t& enableWindows = settingsVar[18];          // 扩展前台
 
 	uint8_t& enableScreenDebug = settingsVar[30];        // Doze调试日志
 
@@ -91,12 +92,6 @@ public:
 				memcpy(settingsVar, tmp, SETTINGS_SIZE);
 
 				bool isError = false;
-				if (clusterBind > 6) {
-					freezeit.logFmt("核心绑定参数[%d]错误, 已重置为 [0] [1] [2] [3]",
-						static_cast<int>(clusterBind));
-					clusterBind = 0;
-					isError = true;
-				}
 				if (setMode > 5) {
 					freezeit.logFmt("冻结模式参数[%d]错误, 已重设为 全局SIGSTOP", static_cast<int>(setMode));
 					setMode = 0;
@@ -127,6 +122,10 @@ public:
 			}
 		}
 		else {
+			if (freezeit.isOppoVivo) {
+				freezeit.log("开启扩展识别 OPPO/VIVO/IQOO/REALME");
+				enableWindows = true;
+			}
 			freezeit.log("设置文件不存在, 将初始化设置文件");
 			freezeit.log(save() ? "⚙️设置成功" : "🔧设置文件写入失败");
 		}
@@ -142,26 +141,6 @@ public:
 
 	size_t size() {
 		return SETTINGS_SIZE;
-	}
-
-	string getClusterText() const {
-		switch (clusterBind) {
-		case 0:
-		default:
-			return "[0] [1] [2] [3]";
-		case 1:
-			return "[0] [1] [2]";
-		case 2:
-			return "[3] [4]";
-		case 3:
-			return "[4] [5] [6]";
-		case 4:
-			return "[5] [6]";
-		case 5:
-			return "[7]";
-		case 6:
-			return "[4] [5] [6] [7]";
-		}
 	}
 
 	int getRefreezeTimeout() {

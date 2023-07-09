@@ -25,7 +25,7 @@ $sysroot = "--sysroot=D:/AndroidSDK/ndk/25.2.9519653/toolchains/llvm/prebuilt/wi
 $cppFlags = "-std=c++20 -static -s -Ofast -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
 
 log "Compiler..."
-& $clang $target $sysroot $cppFlags.Split(' ') -I. main.cpp -o magisk/${id}
+& $clang $target $sysroot $cppFlags.Split(' ') -Iinclude src/main.cpp -o magisk/${id}
 if (-not$?)
 {
     log "Compiler fail"

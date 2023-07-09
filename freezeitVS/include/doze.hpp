@@ -41,9 +41,9 @@ private:
 			if (line[line.length() - 6] != ',')continue;
 
 			int uid = atoi(line.c_str() + line.length() - 5);
-			if (managedApp.without(uid))continue;
+			if (!managedApp.contains(uid))continue;
 
-			auto& info = managedApp.getRaw()[uid];
+			auto& info = managedApp[uid];
 			if (info.isBlacklist()) {
 				tmp += "dumpsys deviceidle whitelist -" + info.package + ";";
 				tmpLabel += info.label + " ";
@@ -59,9 +59,10 @@ private:
 
 		tmp.clear();
 		tmpLabel.clear();
-		for (auto& [uid, info] : managedApp.getRaw()) {
-			if (info.isSystemApp) continue;
-			if (info.isWhitelist() && !existSet.contains(uid)) {
+		for (const auto& info : managedApp.getRaw()) {
+			if (info.uid < 0 || info.isSystemApp) continue;
+
+			if (info.isWhitelist() && !existSet.contains(info.uid)) {
 				tmp += "dumpsys deviceidle whitelist +" + info.package + ";";
 				tmpLabel += info.label + " ";
 			}
@@ -226,7 +227,7 @@ public:
 				deltaTime %= 60;
 			}
 			if (deltaTime) tmp.appendFmt("%d秒", deltaTime);
-			tmp.appendFmt(" 唤醒率 %d.%d %%", activeRate / 10, activeRate % 10);
+			tmp.appendFmt(" 唤醒率 %d.%d%%", activeRate / 10, activeRate % 10);
 			freezeit.log(tmp.c_str());
 
 			struct st {

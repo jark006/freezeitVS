@@ -48,6 +48,7 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/mount.h>
 #include <sys/system_properties.h>
 
 using std::set;
@@ -146,10 +147,11 @@ struct uidTimeStruct {
 };
 
 struct appInfoStruct {
+	int uid = -1;
 	FREEZE_MODE freezeMode = FREEZE_MODE::FREEZER; // [10]:杀死 [20]:SIGSTOP [30]:freezer [40]:配置 [50]:内置
 	bool isTolerant = true;        // 宽容的 有前台服务也算前台
 	int failFreezeCnt = 0;         // 冻结失败计数
-	bool isSystemApp;              // 是否系统应用
+	bool isSystemApp = true;       // 是否系统应用
 	time_t startRunningTime = 0;   // 某次开始运行时刻
 	time_t stopRunningTime = 0;    // 某次冻结运行时刻
 	time_t totalRunningTime = 0;   // 运行时长
@@ -157,25 +159,25 @@ struct appInfoStruct {
 	string label;                  // 名称
 	vector<int> pids;              // PID列表
 
-	bool needBreakNetwork() {
+	bool needBreakNetwork() const {
 		return freezeMode == FREEZE_MODE::SIGNAL_BREAK || freezeMode == FREEZE_MODE::FREEZER_BREAK;
 	}
-	bool isSignalMode() {
+	bool isSignalMode() const {
 		return freezeMode == FREEZE_MODE::SIGNAL_BREAK || freezeMode == FREEZE_MODE::SIGNAL;
 	}
-	bool isFreezeMode() {
+	bool isFreezeMode() const {
 		return freezeMode == FREEZE_MODE::FREEZER_BREAK || freezeMode == FREEZE_MODE::FREEZER;
 	}
-	bool needFreezer() {
+	bool isSignalOrFreezer() const {
 		return freezeMode <= FREEZE_MODE::SIGNAL && freezeMode < FREEZE_MODE::WHITELIST;
 	}
-	bool isWhitelist() {
+	bool isWhitelist() const {
 		return freezeMode >= FREEZE_MODE::WHITELIST;
 	}
-	bool isBlacklist() {
+	bool isBlacklist() const {
 		return freezeMode < FREEZE_MODE::WHITELIST;
 	}
-	bool isTerminateMode() {
+	bool isTerminateMode() const {
 		return freezeMode == FREEZE_MODE::TERMINATE;
 	}
 };
@@ -209,16 +211,12 @@ public:
 
 	stackString& append(const int n) {
 		char tmp[16];
-		return append(tmp, snprintf(tmp, sizeof(tmp), "%d", n));
+		return append(tmp, static_cast<size_t>(snprintf(tmp, sizeof(tmp), "%d", n)));
 	}
 
 	stackString& append(const char* s) {
 		return append(s, strlen(s));
-	}
-
-	stackString& append(const char* s, const int len) {
-		return append(s, static_cast<size_t>(len));
-	}
+	}                    
 
 	stackString& append(const char* s, const size_t len) {
 		memcpy(data + length, s, len);
@@ -387,8 +385,10 @@ namespace Utils {
 		return true;
 	}
 
-	bool writeString(const char* path, const char* buff, const size_t len) {
+	bool writeString(const char* path, const char* buff, size_t len = 0) {
+		if (len == 0)len = strlen(buff);
 		if (len == 0)return true;
+
 		auto fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, 0666);
 		if (fd <= 0) return false;
 
@@ -499,7 +499,7 @@ namespace Utils {
 		auto now = std::chrono::system_clock::now();
 		auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
 		srand(ns);
-		usleep(1000 * (rand() & 0xfff)); //随机休眠 1ms ~ 4s
+		usleep(1000 * (rand() & 0x7ff)); //随机休眠 1ms ~ 2s
 
 		// 检查是否还有其他freezeit进程，防止进程多开
 		char buf[256] = { 0 };

@@ -15,40 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="doze.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="freezeit.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="freezer.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="managedApp.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="server.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="settings.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="systemTools.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="utils.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="vpopen.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="cpp.hint" />
     <None Include="note.md" />
     <None Include="build_pack.ps1" />
@@ -144,5 +110,39 @@
     <Image Include="note\冻它冻结说明.png">
       <Filter>note</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\doze.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\freezeit.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\freezer.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\managedApp.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\server.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\settings.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\systemTools.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\utils.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\vpopen.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

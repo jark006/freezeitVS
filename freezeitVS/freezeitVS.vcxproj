@@ -19,20 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="doze.hpp" />
-    <ClInclude Include="freezeit.hpp" />
-    <ClInclude Include="freezer.hpp" />
-    <ClInclude Include="managedApp.hpp" />
-    <ClInclude Include="server.hpp" />
-    <ClInclude Include="settings.hpp" />
-    <ClInclude Include="systemTools.hpp" />
-    <ClInclude Include="utils.hpp" />
-    <ClInclude Include="vpopen.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="build_ARM64.ps1" />
     <None Include="build_pack.ps1" />
     <None Include="build_X64.ps1" />
@@ -72,6 +58,20 @@
     <Image Include="note\ic_launcher_width.png" />
     <Image Include="note\ic_launcher_width2.png" />
     <Image Include="note\冻它冻结说明.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\doze.hpp" />
+    <ClInclude Include="include\freezeit.hpp" />
+    <ClInclude Include="include\freezer.hpp" />
+    <ClInclude Include="include\managedApp.hpp" />
+    <ClInclude Include="include\server.hpp" />
+    <ClInclude Include="include\settings.hpp" />
+    <ClInclude Include="include\systemTools.hpp" />
+    <ClInclude Include="include\utils.hpp" />
+    <ClInclude Include="include\vpopen.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{df1c9687-2346-4182-a9e7-8fd35001ac96}</ProjectGuid>
@@ -150,7 +150,9 @@
     <CustomBuildStep>
       <RootFolder>
       </RootFolder>
-      <TreatOutputAsContent>true</TreatOutputAsContent>
+      <TreatOutputAsContent>false</TreatOutputAsContent>
+      <Outputs>
+      </Outputs>
     </CustomBuildStep>
     <PreBuildEvent>
       <Command>
@@ -161,7 +163,8 @@
 "C:\Program Files\PowerShell\7\pwsh.exe" build_pack.ps1</Command>
     </PostBuildEvent>
     <PostBuildEvent>
-      <Message>编译并打包</Message>
+      <Message>
+      </Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
