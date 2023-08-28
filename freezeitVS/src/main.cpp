@@ -27,8 +27,9 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
+    //先获取模块目录，下面Init开启守护线程后就不能获取了
     char fullPath[1024] = {};
-    auto pathPtr = realpath(argv[0], fullPath); //先获取模块目录，下面Init开启守护线程后就不能获取了
+    auto pathPtr = realpath(argv[0], fullPath); 
 
     Utils::Init();
 
@@ -49,5 +50,5 @@ int main(int argc, char **argv) {
 }
 
 void test() {
-    printf("Test2\n");
+    printf("Test\n");
 }

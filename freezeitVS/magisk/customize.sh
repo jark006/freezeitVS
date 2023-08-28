@@ -79,7 +79,7 @@ module_version="$(grep_prop version "$MODPATH"/module.prop)"
 echo "- 正在安装 $module_version"
 
 fullApkPath=$(ls "$MODPATH"/freezeit*.apk)
-apkPath=$TMPDIR/freezeit.apk
+apkPath=/data/local/tmp/freezeit.apk
 mv -f "$fullApkPath" "$apkPath"
 chmod 666 "$apkPath"
 

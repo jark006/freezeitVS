@@ -23,5 +23,5 @@
 #define PROT_READ
 #define MAP_PRIVATE
 #define BINDER_CURRENT_PROTOCOL_VERSION
-#define BINDER_VERSION _IOWR('b', 9, struct binder_version)
-#define BINDER_FREEZE _IOW('b', 14, struct binder_freeze_info)
+#define BINDER_VERSION
+#define BINDER_FREEZE

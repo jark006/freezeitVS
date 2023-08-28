@@ -21,12 +21,7 @@ wait_until_login() {
 remove_freezeit(){
     wait_until_login
 
-    pidof freezeit | xargs kill -9
-    pidof io.github.jark006.freezeit | xargs kill -9
     pm uninstall io.github.jark006.freezeit
-    
-    rm -rf /data/system/freezeit.conf
-    rm -rf /data/system/freezeit
     rm -rf /sdcard/Android/freezeit*
 }
 
