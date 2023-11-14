@@ -805,7 +805,7 @@ public:
     void updatePendingByLocalSocket() {
         START_TIME_COUNT;
 
-        int buff[64];
+        int buff[64] = {};
         int uidCnt = 0;
         for (const auto& [uid, remainSec] : pendingHandleList) {
             buff[uidCnt++] = uid;

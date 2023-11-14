@@ -1,20 +1,24 @@
-# Freezeit 冻它
+# FreezeitRelease 冻它模块发布页
 
 **[面具模块]** 实现部分墓碑机制，自动暂停后台进程的运行。
 
 **[MagiskModule]** Implement a partial tombstone mechanism to automatically suspend background processes.
 
----
+### 相关链接
 
-[教程 Tutorials](https://jark006.github.io/FreezeitIntroduction/)
+1. [项目开源地址](https://github.com/jark006/freezeitVS)
 
-[酷安 @JARK006](https://www.coolapk.com/u/1212220) 
+1. [管理器开源地址](https://github.com/jark006/freezeitapp)
 
-[QQ群组 781222669](https://jq.qq.com/?_wv=1027&k=Q5aVUglt)
+1. [模块包发布地址](https://github.com/jark006/freezeitRelease)
 
-[Telegram Group](https://t.me/+sjDX1oTk31ZmYjY1)
+### 其他链接
 
-[蓝奏云下载](https://jark006.lanzout.com/b017oz9if) 密码: dy6i
+[教程 Tutorials](https://jark006.github.io/FreezeitIntroduction/) |
+[酷安 @JARK006](https://www.coolapk.com/u/1212220) |
+[QQ频道 冻它模块](https://qun.qq.com/qqweb/qunpro/share?_wv=3&_wwv=128&appChannel=share&inviteCode=1W6opB7&appChannel=share&businessType=9&from=246610&biz=ka) |
+[Telegram Group](https://t.me/+sjDX1oTk31ZmYjY1) |
+[蓝奏云 密码: dy6i](https://jark006.lanzout.com/b017oz9if) 
 
 ---
 

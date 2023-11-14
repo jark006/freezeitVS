@@ -240,7 +240,7 @@ public:
         case 27: //
         case 28: //
         case 29: //
-        case 30: // Doze调试日志
+        case 30: // 调试日志
         {
             if (val != 0 && val != 1)
                 return snprintf(replyBuf, REPLY_BUF_SIZE, "开关值错误, 正常范围:0/1, 欲设为:%d", val);

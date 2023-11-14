@@ -13,7 +13,6 @@
   <ItemGroup>
     <None Include="build_ARM64.ps1" />
     <None Include="build_pack.ps1" />
-    <None Include="build_test.ps1" />
     <None Include="build_X64.ps1" />
     <None Include="cpp.hint" />
     <None Include="magisk\customize.sh" />
@@ -21,11 +20,7 @@
     <None Include="magisk\service.sh" />
     <None Include="magisk\system.prop" />
     <None Include="magisk\uninstall.sh" />
-    <None Include="note.md" />
-    <None Include="note\ico.psd" />
-    <None Include="note\new_icon.psd" />
-    <None Include="note\termux设置.md" />
-    <None Include="note\冻它2.6.2 _冻结操作逻辑路线.xlsx" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="changelog.txt" />
@@ -33,28 +28,9 @@
     <Text Include="magisk\appcfg.txt" />
     <Text Include="magisk\applabel.txt" />
     <Text Include="magisk\changelog.txt" />
-    <Text Include="note\amData.txt" />
-    <Text Include="note\amHelp.txt" />
-    <Text Include="note\dumpsysData.txt" />
-    <Text Include="note\freezeit_logo_svg.txt" />
-    <Text Include="note\pmHelp.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="note\ic_launcher_background.png" />
-    <Image Include="note\ic_launcher_background2.png" />
-    <Image Include="note\ic_launcher_foreground.png" />
-    <Image Include="note\ic_launcher_foreground2.png" />
-    <Image Include="note\ic_launcher_round.png" />
-    <Image Include="note\ic_launcher_round2.png" />
-    <Image Include="note\ic_launcher_square.png" />
-    <Image Include="note\ic_launcher_square2.png" />
-    <Image Include="note\ic_launcher_width.png" />
-    <Image Include="note\ic_launcher_width2.png" />
-    <Image Include="note\冻它冻结说明.png" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="test\test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\doze.hpp" />
@@ -66,7 +42,6 @@
     <ClInclude Include="include\systemTools.hpp" />
     <ClInclude Include="include\utils.hpp" />
     <ClInclude Include="include\vpopen.hpp" />
-    <ClInclude Include="test\inc.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{df1c9687-2346-4182-a9e7-8fd35001ac96}</ProjectGuid>

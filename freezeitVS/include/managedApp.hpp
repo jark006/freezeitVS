@@ -63,7 +63,6 @@ private:
             "io.github.huskydg.magisk",             // Magisk Delta
             "io.github.jark006.freezeit",           // 冻它
             "io.github.jark006.weather",            // 小天气
-            "com.jark006.weather",                  // 小天气
             "org.lsposed.manager",                  // LSPosed
             "com.github.tianma8023.xposed.smscode", // XposedSmsCode
             "name.monwf.customiuizer",              // 米客 原版

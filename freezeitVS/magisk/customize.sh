@@ -1,13 +1,13 @@
 $BOOTMODE || abort "- 🚫 安装失败，仅支持在 Magisk 或 KernelSU 下安装"
-[ "$API" -ge 31 ] || abort "- 🚫 安装失败，仅支持 安卓12 或以上"
 
 kernelVersionCode=$(uname -r |awk -F '.' '{print $1*100+$2}')
 if [ $kernelVersionCode -lt 510 ];then
     echo "- 🚫 安装失败，仅支持内核版本 5.10 或以上"
     echo "- 🚫 本机内核版本 $(uname -r)"
-    echo "- 🚫 版本号 $kernelVersionCode"
     abort
 fi
+
+[ "$API" -ge 31 ] || abort "- 🚫 安装失败，仅支持 安卓12 或以上"
 
 if [ "$ARCH" == "arm64" ];then
     mv "$MODPATH"/freezeitARM64 "$MODPATH"/freezeit
@@ -15,7 +15,6 @@ if [ "$ARCH" == "arm64" ];then
 elif [ "$ARCH" == "x64" ];then
     mv "$MODPATH"/freezeitX64 "$MODPATH"/freezeit
     rm "$MODPATH"/freezeitARM64
-    echo "X64设备"
 else
     abort "- 🚫 安装失败，仅支持ARM64或X64, 不支持当前架构: $ARCH"
 fi
@@ -30,27 +29,32 @@ fi
 
 output=$(pm list packages cn.myflv.android.noactive)
 if [ ${#output} -gt 2 ]; then
-    echo "- ⚠️检测到 [NoActive](myflavor), 请到 LSPosed 手动取消勾选"
+    echo "- ⚠️检测到 [NoActive](myflavor), 请到 LSPosed 将其禁用"
 fi
 
 output=$(pm list packages com.github.uissd.miller)
 if [ ${#output} -gt 2 ]; then
-    echo "- ⚠️检测到 [Miller](UISSD), 请到 LSPosed 手动取消勾选"
+    echo "- ⚠️检测到 [Miller](UISSD), 请到 LSPosed 将其禁用"
 fi
 
 output=$(pm list packages com.github.f19f.milletts)
 if [ ${#output} -gt 2 ]; then
-    echo "- ⚠️检测到 [MiTombstone](f19没有新欢), 请到 LSPosed 手动取消勾选"
+    echo "- ⚠️检测到 [MiTombstone](f19没有新欢), 请到 LSPosed 将其禁用"
 fi
 
 output=$(pm list packages com.ff19.mitlite)
 if [ ${#output} -gt 2 ]; then
-    echo "- ⚠️检测到 [Mitlite](f19没有新欢), 请到 LSPosed 手动取消勾选"
+    echo "- ⚠️检测到 [Mitlite](f19没有新欢), 请到 LSPosed 将其禁用"
+fi
+
+output=$(pm list packages com.sidesand.millet)
+if [ ${#output} -gt 2 ]; then
+    echo "- ⚠️检测到 [SMillet](酱油一下下), 请到 LSPosed 将其禁用"
 fi
 
 output=$(pm list packages com.mubei.android)
 if [ ${#output} -gt 2 ]; then
-    echo "- ⚠️检测到 [墓碑](离音), 请到 LSPosed 手动取消勾选"
+    echo "- ⚠️检测到 [墓碑](离音), 请到 LSPosed 将其禁用"
 fi
 
 if [ -e "/data/adb/modules/mubei" ]; then
@@ -61,13 +65,6 @@ fi
 if [ -e "/data/adb/modules/Hc_tombstone" ]; then
     echo "- ⚠️已禁用 [新内核墓碑](时雨星空/火柴)"
     touch /data/adb/modules/Hc_tombstone/disable
-fi
-
-output=$(pm uninstall com.jark006.freezeit)
-if [ "$output" == "Success" ]; then
-    echo "- ⚠️ 冻它APP已更换新包名, 旧版APP已卸载"
-    echo "- ⚠️ 安装完毕后, 请到 LSPosed 重新启用冻它"
-    echo ""
 fi
 
 ORG_appcfg="/data/adb/modules/freezeit/appcfg.txt"
@@ -113,7 +110,6 @@ else
         echo "*********************** !!!"
         echo "  冻它APP 依旧安装失败, 原因: [$output]"
         echo "  请手动安装 [ $apkPathSdcard ]"
-        echo "  如果是降级安装, 请手动卸载冻它APP, 然后再次安装。"
         echo "*********************** !!!"
     fi
 fi
@@ -130,6 +126,6 @@ echo ""
 cat "$MODPATH"/changelog.txt
 echo ""
 echo "- 安装完毕, 重启生效"
-echo "- 若出现异常日志, 请反馈给作者, 谢谢"
+echo "- 若出现以下异常日志文件, 请反馈给作者, 谢谢"
 echo "- [ /sdcard/Android/freezeit_crash_log.txt ]"
 echo ""

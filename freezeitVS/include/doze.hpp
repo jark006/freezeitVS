@@ -57,21 +57,6 @@ private:
             system(tmp.c_str());
         }
 
-        //tmp.clear();
-        //tmpLabel.clear();
-        //for (const auto& appInfo : managedApp.appInfoMap) {
-        //    if (appInfo.uid < ManagedApp::UID_START || appInfo.isSystemApp) continue;
-
-        //    if (appInfo.isWhitelist() && !existSet.contains(appInfo.uid)) {
-        //        tmp += "dumpsys deviceidle whitelist +" + appInfo.package + ";";
-        //        tmpLabel += appInfo.label + " ";
-        //    }
-        //}
-        //if (tmp.length()) {
-        //    freezeit.logFmt("加入电池优化白名单: %s", tmpLabel.c_str());
-        //    system(tmp.c_str());
-        //}
-
         END_TIME_COUNT;
     }
 

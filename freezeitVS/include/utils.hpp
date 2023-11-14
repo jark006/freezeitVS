@@ -271,7 +271,7 @@ public:
     }
 
     stackString& append(const int n) {
-        char tmp[16];
+        char tmp[16] = {};
         return append(tmp, static_cast<size_t>(snprintf(tmp, sizeof(tmp), "%d", n)));
     }
 
@@ -395,14 +395,6 @@ namespace Utils {
             exit(-1);
         }
         return res;
-    }
-
-    void myDecode(const void* _ptr, int len) {
-        auto ptr = (uint8_t*)_ptr;
-        while (len--) {
-            *ptr ^= 0x91;
-            ptr++;
-        }
     }
 
     int readInt(const char* path) {

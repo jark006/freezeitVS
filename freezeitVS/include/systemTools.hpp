@@ -425,24 +425,6 @@ public:
         else {
             freezeit.logFmt("核心频率获取失败 cpuCluster %d size %d", cpuCluster, res.size());
         }
-
-        //switch (cpuCluster) {
-        //case 431:
-        //    COLOR_CPU = COLOR_CLUSTER[1];
-        //    break;
-        //case 422:
-        //    COLOR_CPU = COLOR_CLUSTER[2];
-        //    break;
-        //case 3221:
-        //    COLOR_CPU = COLOR_CLUSTER[3];
-        //    break;
-        //case 62:
-        //    COLOR_CPU = COLOR_CLUSTER[4];
-        //    break;
-        //case 251:
-        //    COLOR_CPU = COLOR_CLUSTER[5];
-        //    break;
-        //}
     }
 
     uint32_t drawChart(uint32_t* imgBuf, uint32_t height, uint32_t width) {
@@ -511,26 +493,6 @@ public:
                     imgBuf[heightBase + x] = x < mem_x_pos[4] ? COLOR_BLUE : COLOR_GRAY;
             }
         }
-
-        //for (int minuteIdx = 1; minuteIdx < maxBucketSize; minuteIdx++) {
-        //    for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
-        //        uint32_t y0 =
-        //            (100 - cpuRealTimeCore[(cpuBucketIdx + minuteIdx) & 0x1f][coreIdx].usage) *
-        //            imgHeight / 100;
-        //        uint32_t y1 =
-        //            (100 - cpuRealTimeCore[(cpuBucketIdx + minuteIdx + 1) & 0x1f][coreIdx].usage) *
-        //            imgHeight / 100;
-
-        //        if (y0 <= 0) y0 = 1;
-        //        else if (y0 >= imgHeight) y0 = imgHeight - 1;
-
-        //        if (y1 <= 0) y1 = 1;
-        //        else if (y1 >= imgHeight) y1 = imgHeight - 1;
-
-        //        drawLine(imgBuf, width, COLOR_CPU[coreIdx], (width * (minuteIdx - 1)) / 31, y0,
-        //            (width * minuteIdx) / 31, y1);
-        //    }
-        //}
 
         for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
             for (int minuteIdx = 1; minuteIdx < maxBucketSize; minuteIdx++) {

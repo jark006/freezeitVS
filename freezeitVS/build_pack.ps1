@@ -16,8 +16,8 @@ $versionCode = ($moduleProp | Where-Object { $_ -match "versionCode=" }).split('
 $zipFile = "${id}_v${version}.zip"
 
 $releaseDir = "D:/Project-github/freezeitRelease"
+$ndkPath = "D:/AndroidSDK/ndk/26.1.10909125"
 
-$ndkPath = "D:/AndroidSDK/ndk/android-ndk-r26b"
 $clang = "${ndkPath}/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe"
 $sysroot = "--sysroot=${ndkPath}/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
 $cppFlags = "-std=c++20 -static -s -Ofast -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
