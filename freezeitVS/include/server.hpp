@@ -119,7 +119,7 @@ public:
                 }
 
                 //设置接收超时
-                timeval timeout = { 1, 0 }; // 1秒 超时
+                timeval timeout = { 5, 0 }; // 5秒 超时
                 if (setsockopt(clnt_sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout,
                     sizeof(timeval))) {
                     fprintf(stderr, "setsockopt 超时设置出错 servFd[%d] clntFd[%d] [%d]:[%s]", serv_sock,
@@ -129,40 +129,40 @@ public:
                 }
 
                 uint8_t dataHeader[6];
-                uint32_t recvLen = recv(clnt_sock, dataHeader, sizeof(dataHeader), MSG_WAITALL);
-                if (recvLen != sizeof(dataHeader)) {
+                auto headerLen = recv(clnt_sock, dataHeader, sizeof(dataHeader), MSG_WAITALL);
+                if (headerLen != sizeof(dataHeader)) {
                     close(clnt_sock);
-                    fprintf(stderr, "clnt_sock recv dataHeader len[%u]", recvLen);
+                    fprintf(stderr, "clnt_sock recv dataHeader len[%ld]", headerLen);
                     continue;
                 }
 
-                recvLen = *((uint32_t*)dataHeader);
+                uint32_t payloadLen = *((uint32_t*)dataHeader);
                 uint32_t appCommand = dataHeader[4];
                 uint32_t XOR_value = dataHeader[5];
 
-                // "\0AUTH\n" B站发的，前4字节： 大端 4281684, 小端 1414873344
-                if (recvLen == 1414873344 || recvLen == 4281684) {
+                // "\0AUTH\n" Bilibili客户端乱发的，前4字节： 大端 4281684, 小端 1414873344
+                if (payloadLen == 1414873344 || payloadLen == 4281684) {
                     close(clnt_sock);
                     continue;
                 }
-                else if (recvLen >= RECV_BUF_SIZE) {
-                    freezeit.logFmt("数据格式异常 recvLen[%u] HEX[%s]", recvLen,
+                else if (payloadLen >= RECV_BUF_SIZE) {
+                    freezeit.logFmt("数据格式异常 payloadLen[%u] dataHeaderHEX[%s]", payloadLen,
                         Utils::bin2Hex(dataHeader, 6).c_str());
                     close(clnt_sock);
                     continue;
                 }
 
-                if (recvLen) {
-                    uint32_t lenTmp = recv(clnt_sock, recvBuf.get(), recvLen, MSG_WAITALL);
-                    if (lenTmp != recvLen) {
+                if (payloadLen) {
+                    uint32_t lenTmp = recv(clnt_sock, recvBuf.get(), payloadLen, MSG_WAITALL);
+                    if (lenTmp != payloadLen) {
                         fprintf(stderr, "附带数据接收错误, appCommand[%u], 要求[%u], 实际接收[%u]", 
-                            appCommand,	recvLen, lenTmp);
+                            appCommand,	payloadLen, lenTmp);
                         close(clnt_sock);
                         continue;
                     }
 
                     uint8_t XOR_cal = 0;
-                    for (uint32_t i = 0; i < recvLen; i++)
+                    for (uint32_t i = 0; i < payloadLen; i++)
                         XOR_cal ^= (uint8_t)recvBuf[i];
 
                     if (XOR_value != XOR_cal) {
@@ -172,21 +172,26 @@ public:
                     }
                 }
 
-                recvBuf[recvLen] = 0;
-                handleCmd(static_cast<MANAGER_CMD>(appCommand), recvLen, clnt_sock);
+                recvBuf[payloadLen] = 0;
+                handleCmd(static_cast<MANAGER_CMD>(appCommand), payloadLen, clnt_sock);
             }
             close(serv_sock);
         }
     }
 
     void handleCmd(const MANAGER_CMD appCommand, const int recvLen, const int clnt_sock) {
-        char* replyPtr;
-        uint32_t replyLen;
+        const char* replyPtr = nullptr;
+        uint32_t replyLen = 0;
         switch (appCommand) {
         case MANAGER_CMD::getPropInfo: {
             replyPtr = replyBuf.get();
-            replyLen = freezeit.formatProp(replyBuf.get(), REPLY_BUF_SIZE,
-                systemTools.cpuCluster);
+            replyLen = snprintf(replyBuf.get(), REPLY_BUF_SIZE,
+                "%s\n%s\n%s\n%s\n%s\n%d\n%s\n%s\n%s\n%s\n%u",
+                freezeit.prop["id"].c_str(), freezeit.prop["name"].c_str(),
+                freezeit.prop["version"].c_str(), freezeit.prop["versionCode"].c_str(),
+                freezeit.prop["author"].c_str(),
+                systemTools.cpuCluster, freezeit.moduleEnv.c_str(), freezer.getCurWorkModeStr(),
+                systemTools.androidVerStr.c_str(), systemTools.kernelVerStr.c_str(), systemTools.extMemorySize);
         } break;
 
         case MANAGER_CMD::getChangelog: {
@@ -200,18 +205,18 @@ public:
         } break;
 
         case MANAGER_CMD::getAppCfg: {
-            uint32_t intLen = 0;
+            uint32_t intCnt = 0;
             const auto ptr = reinterpret_cast<int*>(replyBuf.get());
             for (const auto& appInfo : managedApp.appInfoMap) {
                 if (appInfo.uid < 0)continue;
 
-                ptr[intLen++] = appInfo.uid;
-                ptr[intLen++] = static_cast<int>(appInfo.freezeMode);
-                ptr[intLen++] = appInfo.isTolerant ? 1 : 0;
+                ptr[intCnt++] = appInfo.uid;
+                ptr[intCnt++] = static_cast<int>(appInfo.freezeMode);
+                ptr[intCnt++] = appInfo.isPermissive ? 1 : 0;
             }
 
             replyPtr = replyBuf.get();
-            replyLen = intLen << 2; // intLen*sizeof(int)
+            replyLen = intCnt * sizeof(int);
         } break;
 
         case MANAGER_CMD::getRealTimeInfo: {
@@ -232,18 +237,15 @@ public:
                 break;
             }
 
-            auto& availableMiB = ((uint32_t*)recvBuf.get())[2]; // Unit: MiB
+            uint32_t availableMiB = ((uint32_t*)recvBuf.get())[2]; // Unit: MiB
 
             systemTools.getCPU_realtime(availableMiB);
-            replyLen = systemTools.drawChart((uint32_t*)replyBuf.get(), height,
-                width);
-            replyLen += systemTools.formatRealTime(
-                reinterpret_cast<int*>(replyBuf.get() + replyLen));
+            replyLen = systemTools.drawChart((uint32_t*)replyBuf.get(), height, width);
+            replyLen += systemTools.formatRealTime(reinterpret_cast<int*>(replyBuf.get() + replyLen));
             replyPtr = replyBuf.get();
         } break;
 
         case MANAGER_CMD::getUidTime: {
-            int intLen = 0;
             int* ptr = reinterpret_cast<int*>(replyBuf.get());
             struct st {
                 int uid;
@@ -253,57 +255,46 @@ public:
             vector<st> uidTimeSort;
             uidTimeSort.reserve(256);
 
-            /* 按总时间排序 ***********************************************/
-
             for (const auto& [uid, timeList] : doze.updateUidTime())
                 uidTimeSort.emplace_back(st{ uid, timeList.total, timeList.lastTotal });
             std::sort(uidTimeSort.begin(), uidTimeSort.end(),
                 [](const st& a, const st& b) { return a.total > b.total; });
 
-
-            /* 先按跳动时间排序，再按总时间排序。跳动太大，不好查看 *********/
-
-            //for (const auto& [uid, timeList] : doze.updateUidTime())
-            //	if (timeList.total != timeList.lastTotal)
-            //		uidTimeSort.emplace_back(st{ uid, timeList.total, timeList.lastTotal });
-
-            //const auto size = uidTimeSort.size();
-
-            //for (const auto& [uid, timeList] : doze.updateUidTime())
-            //	if (timeList.total == timeList.lastTotal)
-            //		uidTimeSort.emplace_back(st{ uid, timeList.total, timeList.lastTotal });
-
-            //if (size)
-            //	std::sort(uidTimeSort.begin(), uidTimeSort.begin() + size,
-            //		[](const st& a, const st& b) { return (a.total - a.lastTotal) > (b.total - b.lastTotal); });
-
-            //std::sort(uidTimeSort.begin() + size, uidTimeSort.end(),
-            //	[](const st& a, const st& b) { return a.total > b.total; });
-
-            /*************************************************************/
-
-
+            int intCnt = 0;
             for (const auto& [uid, total, lastTotal] : uidTimeSort) {
-                ptr[intLen++] = uid;
-                ptr[intLen++] = total - lastTotal;
-                ptr[intLen++] = total;
+                ptr[intCnt++] = uid;
+                ptr[intCnt++] = total - lastTotal;
+                ptr[intCnt++] = total;
             }
 
             replyPtr = replyBuf.get();
-            replyLen = intLen << 2; // intLen*sizeof(int)
+            replyLen = intCnt * sizeof(int);
+        } break;
+
+        case MANAGER_CMD::getXpLog: {
+            const int len = Utils::localSocketRequest(XPOSED_CMD::GET_XP_LOG, nullptr, 0, (int*)replyBuf.get(), REPLY_BUF_SIZE);
+            if (len == 0) {
+                freezeit.log("getXpLog 工作异常, 请确认LSPosed中冻它勾选系统框架, 然后重启");
+                replyPtr = "Freezeit's Xposed log is empty. ";
+                replyLen = 32;
+            }
+            else {
+                replyPtr = replyBuf.get();
+                replyLen = len;
+            }
         } break;
 
         case MANAGER_CMD::getSettings: {
-            replyPtr = reinterpret_cast<char*>(settings.get());
+            replyPtr = settings.get();
             replyLen = settings.size();
         } break;
 
         case MANAGER_CMD::setAppCfg: {
             if (recvLen == 0 || (recvLen % 12)) {
                 replyPtr = replyBuf.get();
-                replyLen = snprintf(replyBuf.get(), 128, "需要12字节的倍数, 实际收到[%u]",
+                replyLen = snprintf(replyBuf.get(), 128, "需要12字节的倍数, 实际收到 %d 字节",
                     recvLen);
-                freezeit.log(replyBuf.get());
+                freezeit.log(string_view(replyBuf.get(), replyLen));
                 break;
             }
 
@@ -316,26 +307,26 @@ public:
             for (int i = 0; i < intSize;) {
                 const int uid = ptr[i++];
                 const FREEZE_MODE freezeMode = static_cast<FREEZE_MODE>(ptr[i++]);
-                const bool isTolerant = ptr[i++] != 0;
+                const bool isPermissive = ptr[i++] != 0;
                 if (managedApp.contains(uid)) {
                     if (managedApp.FREEZE_MODE_SET.contains(freezeMode))
-                        newCfg[uid] = { freezeMode, isTolerant };
+                        newCfg[uid] = { freezeMode, isPermissive };
                     else
-                        freezeit.logFmt("错误配置: UID:%d freezeMode:%d isTolerant:%d", uid,
-                            freezeMode, isTolerant);
+                        freezeit.logFmt("错误配置: UID:%d freezeMode:%d isPermissive:%d", uid,
+                            freezeMode, isPermissive);
                 }
                 else
                     freezeit.logFmt("特殊应用: UID:%d, 已强制自由后台", uid);
             }
 
             string tips;
-            set<int> uidSet;
+            set<int> changeUidSet; // 发生配置变化的应用
             for (const auto& appInfo : managedApp.appInfoMap) {
                 if (appInfo.uid < ManagedApp::UID_START || appInfo.freezeMode == FREEZE_MODE::WHITEFORCE ||
                     !newCfg.contains(appInfo.uid) || appInfo.freezeMode == newCfg[appInfo.uid].freezeMode)
                     continue;
 
-                uidSet.insert(appInfo.uid);
+                changeUidSet.insert(appInfo.uid);
                 tips += freezer.getModeText(appInfo.freezeMode) + "->" +
                     freezer.getModeText(newCfg[appInfo.uid].freezeMode) + " [" +
                     appInfo.label + "]\n";
@@ -343,14 +334,24 @@ public:
             if (tips.length())
                 freezeit.logFmt("配置变化：\n\n%s", tips.c_str());
 
-            // auto runningUids = freezer.getRunningUids(uidSet);
-            auto runningPids = freezer.getRunningPids(uidSet);
             tips.clear();
-            for (const auto& [uid, pids] : runningPids) {
+            for (const auto& [uid, cfg] : newCfg) {
+                if (!managedApp.contains(uid)) {
+                    tips += to_string(uid) + ", ";
+                }
+            }
+            if (tips.length())
+                freezeit.logFmt("以下UID的应用不受冻它管理：[%s] 可在冻它配置页搜索UID查看是哪些应用", tips.c_str());
+
+            // auto runningUids = freezer.getRunningUids(changeUidSet);
+            auto runningPids = freezer.getRunningPids(changeUidSet);
+            tips.clear();
+            for (auto& [uid, pids] : runningPids) {
                 auto& appInfo = managedApp[uid];
                 tips += "\n" + appInfo.label;
                 for (const int pid : pids)
                     tips += " " + to_string(pid);
+                appInfo.pids = std::move(pids);
                 freezer.handleSignal(appInfo, SIGKILL); // 已包含 V1 前置解冻
             }
             if (tips.length())
@@ -362,7 +363,7 @@ public:
             managedApp.saveConfig();
             managedApp.update2xposedByLocalSocket();
 
-            replyPtr = const_cast<char*>("success");
+            replyPtr = "success";
             replyLen = 7;
         } break;
 
@@ -391,7 +392,7 @@ public:
             managedApp.update2xposedByLocalSocket();
             managedApp.saveLabel();
 
-            replyPtr = const_cast<char*>("success");
+            replyPtr = "success";
             replyLen = 7;
         } break;
 
@@ -428,7 +429,7 @@ public:
         } break;
 
         default: {
-            replyPtr = const_cast<char*>("非法命令");
+            replyPtr = "非法命令";
             replyLen = 12;
         } break;
         }

@@ -57,28 +57,20 @@ private:
             system(tmp.c_str());
         }
 
-        tmp.clear();
-        tmpLabel.clear();
-        for (const auto& appInfo : managedApp.appInfoMap) {
-            if (appInfo.uid < ManagedApp::UID_START || appInfo.isSystemApp) continue;
+        //tmp.clear();
+        //tmpLabel.clear();
+        //for (const auto& appInfo : managedApp.appInfoMap) {
+        //    if (appInfo.uid < ManagedApp::UID_START || appInfo.isSystemApp) continue;
 
-            if (appInfo.isWhitelist() && !existSet.contains(appInfo.uid)) {
-                tmp += "dumpsys deviceidle whitelist +" + appInfo.package + ";";
-                tmpLabel += appInfo.label + " ";
-            }
-        }
-        if (tmp.length()) {
-            freezeit.logFmt("加入电池优化白名单: %s", tmpLabel.c_str());
-            system(tmp.c_str());
-        }
-
-        if (settings.enableScreenDebug) {
-            tmp.clear();
-            for (const auto uid : existSet)
-                tmp += managedApp[uid].label + " ";
-            if (tmp.length())
-                freezeit.logFmt("已在白名单: %s", tmp.c_str());
-        }
+        //    if (appInfo.isWhitelist() && !existSet.contains(appInfo.uid)) {
+        //        tmp += "dumpsys deviceidle whitelist +" + appInfo.package + ";";
+        //        tmpLabel += appInfo.label + " ";
+        //    }
+        //}
+        //if (tmp.length()) {
+        //    freezeit.logFmt("加入电池优化白名单: %s", tmpLabel.c_str());
+        //    system(tmp.c_str());
+        //}
 
         END_TIME_COUNT;
     }
@@ -104,12 +96,8 @@ private:
             return 0;
         }
 
-        if (settings.enableScreenDebug) {
-            const char* str[3] = { "Doze调试: Xposed 获取屏幕状态失败",
-                                  "Doze调试: Xposed 息屏中",
-                                  "Doze调试: Xposed 亮屏中" };
-            freezeit.log(str[buff[0] < 3 ? buff[0] : 1]);
-        }
+        const string_view str[3] = { "Xposed 获取屏幕状态失败", "Xposed 息屏中", "Xposed 亮屏中" };
+        freezeit.debug(str[buff[0] < 3 ? buff[0] : 1]);
 
 
         END_TIME_COUNT;
@@ -131,52 +119,54 @@ private:
         public static final int DISPLAY_STATE_ON_SUSPEND = 6; //非Doze, 类似4
         */
         do {
-            char res[128]; // MAX LEN: 96
-            int mScreenState;
-            if (__system_property_get("debug.tracing.screen_state", res) < 1)
+            //char res[128]; // MAX LEN: 96
+            //int mScreenState;
+            //if (__system_property_get("debug.tracing.screen_state", res) < 1)
+            //    mScreenState = getScreenByLocalSocket();
+            //else mScreenState = res[0] - '0';
+
+            int mScreenState = systemTools.getScreenProperty();
+            if (mScreenState < 0)
                 mScreenState = getScreenByLocalSocket();
-            else mScreenState = res[0] - '0';
 
-            if (settings.enableScreenDebug)
-                if (mScreenState != 1 && mScreenState != 2)
-                    freezeit.logFmt("Doze调试: 屏幕其他状态 mScreenState[%d]", mScreenState);
+            if (mScreenState != 1 && mScreenState != 2)
+                freezeit.debugFmt("屏幕其他状态 mScreenState[%d]", mScreenState);
 
+            // 设备活跃状态
             if (mScreenState == 2 || mScreenState == 5 || mScreenState == 6) {
-                if (settings.enableScreenDebug)
-                    freezeit.logFmt("Doze调试: 亮屏中 mScreenState[%d]", mScreenState);
+                freezeit.debugFmt("亮屏中 mScreenState[%d]", mScreenState);
                 break;
             }
 
+            // 认定设备活跃状态
             if (mScreenState <= 0) {
-                freezeit.logFmt("屏幕状态获取失败 mScreenState[%d]", mScreenState);
+                freezeit.debugFmt("屏幕状态获取失败 mScreenState[%d] 若开机至今未曾息屏，则无法获取屏幕状态", mScreenState);
                 break;
             }
 
             // 以下则是息屏: 1 3 4
-
+            // 
+            // 认定设备活跃状态
             if (systemTools.isAudioPlaying) {
-                if (settings.enableScreenDebug)
-                    freezeit.log("Doze调试: 息屏, 播放中");
+                freezeit.debug("息屏, 播放中");
                 break;
             }
 
             // "Unknown", "Charging", "Discharging", "Not charging", "Full"
             // https://cs.android.com/android/kernel/superproject/+/common-android-mainline-kleaf:common/drivers/power/supply/power_supply_sysfs.c;l=75
+            char res[64];
             Utils::readString("/sys/class/power_supply/battery/status", res, sizeof(res));
             if (!strncmp(res, "Charging", 4) || !strncmp(res, "Full", 4)) {
-                if (settings.enableScreenDebug)
-                    freezeit.log("Doze调试: 息屏, 充电中");
+                freezeit.debug("息屏, 充电中");
                 break;
             }
 
             if (!strncmp(res, "Discharging", 4) || !strncmp(res, "Not charging", 4)) {
-                if (settings.enableScreenDebug)
-                    freezeit.log("Doze调试: 息屏, 未充电");
+                freezeit.debug("息屏, 未充电");
                 return false;
             }
 
-            if (settings.enableScreenDebug)
-                freezeit.logFmt("Doze调试: 息屏, 电池状态未知 [%s]", res);
+            freezeit.debugFmt("息屏, 电池状态未知 [%s]", res);
 
         } while (false);
 
@@ -197,8 +187,7 @@ public:
     bool checkIfNeedToExit() {
         START_TIME_COUNT;
         if (!isInteractive()) {
-            if (settings.enableScreenDebug)
-                freezeit.log("Doze调试: 息屏中, 发现有活动");
+            freezeit.debug("息屏中, 发现有活动");
 
             END_TIME_COUNT;
             return false;
@@ -210,55 +199,65 @@ public:
             system("dumpsys deviceidle unforce");
 
             int deltaTime = time(nullptr) - enterDozeTimeStamp;
-            const int activeRate =
-                deltaTime > 0 ? (1000 * (systemTools.cycleCnt - enterDozeCycleStamp) /
-                    deltaTime) : 0; //CPU 活跃率
+            const int activeRate = deltaTime <= 0 ? 0 :
+                (100 * (systemTools.cycleCnt - enterDozeCycleStamp) / deltaTime); //CPU 活跃率
 
-            if (deltaTime < 60 || activeRate > 800)
-                freezeit.log("休眠了个寂寞...");
-
-            stackString<1024 * 16> tmp("🤪 退出深度Doze 时长 ");
-            if (deltaTime >= 3600) {
-                tmp.appendFmt("%d时", deltaTime / 3600);
-                deltaTime %= 3600;
+            if (deltaTime < 300) {
+                if (deltaTime >= 60)
+                    freezeit.logFmt("退出Doze 小睡了 %d分%d秒", deltaTime / 60, deltaTime % 60);
+                else
+                    freezeit.logFmt("退出Doze 小睡了 %d秒", deltaTime % 60);
             }
-            if (deltaTime >= 60) {
-                tmp.appendFmt("%d分", deltaTime / 60);
-                deltaTime %= 60;
-            }
-            if (deltaTime) tmp.appendFmt("%d秒", deltaTime);
-            tmp.appendFmt(" 唤醒率 %d.%d%%", activeRate / 10, activeRate % 10);
-            freezeit.log(tmp.c_str());
+            else {
+                stackString<1024 * 16> tmp;
 
-            struct st {
-                int uid;
-                int delta;
-            };
-            vector<st> uidTimeSort;
-            uidTimeSort.reserve(32);
-            for (const auto& [uid, timeList] : updateUidTime()) {
-                int delta = (timeList.total - timeList.lastTotal); // 毫秒
-                if (delta <= 100)continue; // 过滤 100毫秒
-                uidTimeSort.emplace_back(st{ uid, delta });
-            }
+                if (activeRate <= 85)
+                    tmp.append("🤪 退出深度Doze 时长 ");
+                else
+                    tmp.append("🤪 这段时间未能进入深度Doze, 请检查应用的唤醒锁使用情况 时长 ");
 
-            std::sort(uidTimeSort.begin(), uidTimeSort.end(),
-                [](const st& a, const st& b) { return a.delta > b.delta; });
-
-            tmp.clear();
-            for (auto& [uid, delta] : uidTimeSort) {
-                tmp.append("[", 1);
-                const int minutesMilliSec = 60 * 1000;
-                if (delta >= minutesMilliSec) {
-                    tmp.appendFmt("%d分", delta / minutesMilliSec);
-                    delta %= minutesMilliSec;
+                if (deltaTime >= 3600) {
+                    tmp.appendFmt("%d时", deltaTime / 3600);
+                    deltaTime %= 3600;
                 }
-                tmp.appendFmt("%d.%03d秒] ", delta / 1000, delta % 1000);
-                tmp.appendFmt("%s\n", managedApp.getLabel(uid).c_str());
-            }
+                if (deltaTime >= 60) {
+                    tmp.appendFmt("%d分", deltaTime / 60);
+                    deltaTime %= 60;
+                }
+                if (deltaTime) tmp.appendFmt("%d秒", deltaTime);
+                tmp.appendFmt(" 唤醒率 %d%%", activeRate);
+                freezeit.log(string_view(tmp.c_str(), tmp.length));
 
-            if (tmp.length)
-                freezeit.logFmt("Doze期间应用的CPU活跃时间:\n\n%s", *tmp);
+                struct st {
+                    int uid;
+                    int delta;
+                };
+                vector<st> uidTimeSort;
+                uidTimeSort.reserve(32);
+                for (const auto& [uid, timeList] : updateUidTime()) {
+                    int delta = (timeList.total - timeList.lastTotal); // 毫秒
+                    if (delta <= 100)continue; // 过滤 100毫秒
+                    uidTimeSort.emplace_back(st{ uid, delta });
+                }
+
+                std::sort(uidTimeSort.begin(), uidTimeSort.end(),
+                    [](const st& a, const st& b) { return a.delta > b.delta; });
+
+                tmp.clear();
+                for (auto& [uid, delta] : uidTimeSort) {
+                    tmp.append("[", 1);
+                    const int minutesMilliSec = 60 * 1000;
+                    if (delta >= minutesMilliSec) {
+                        tmp.appendFmt("%d分", delta / minutesMilliSec);
+                        delta %= minutesMilliSec;
+                    }
+                    tmp.appendFmt("%d.%03d秒] ", delta / 1000, delta % 1000);
+                    tmp.appendFmt("%s\n", managedApp.getLabel(uid).c_str());
+                }
+
+                if (tmp.length)
+                    freezeit.logFmt("Doze期间应用的CPU活跃时间:\n\n%s", *tmp);
+            }
         }
         END_TIME_COUNT;
         return true;
@@ -280,23 +279,20 @@ public:
         if ((nowTimeStamp - lastInteractiveTime) < (TIMEOUT + 60L))
             return false;
 
-        if (settings.enableScreenDebug)
-            freezeit.log("息屏状态已超时，正在确认息屏状态");
+        freezeit.debug("息屏状态已超时，正在确认息屏状态");
 
         // 如果系统之前已经自行进入轻度Doze, 退出Doze的瞬间（此时可能还没亮屏）导致现在才执行时间判断
         // 此时进入Doze不合理，需等等，再确认一遍
         usleep(1000 * 200); // 休眠 200ms
         if (isInteractive()) {
-            if (settings.enableScreenDebug)
-                freezeit.log("确认新状态：已亮屏或充电中, 退出息屏");
+            freezeit.debug("确认新状态：已亮屏或充电中, 退出息屏");
             return false;
         }
 
         isScreenOffStandby = true;
 
         if (settings.enableDoze) {
-            if (settings.enableScreenDebug)
-                freezeit.log("开始准备深度Doze");
+            freezeit.debug("开始准备深度Doze");
             updateDozeWhitelist();
             updateUidTime();
 
@@ -326,7 +322,7 @@ public:
             int uid;
             long long userTime, systemTime; // us 微秒
             sscanf(line.c_str(), "%d: %lld %lld", &uid, &userTime, &systemTime);
-            if (managedApp.contains(uid) && (userTime >= 1000 || systemTime >= 1000)) {
+            if (managedApp.isBlackList(uid) && (userTime >= 1000 || systemTime >= 1000)) {
                 auto& appTime = uidTime[uid];
                 appTime.lastTotal = appTime.total;
                 appTime.total = static_cast<int>((systemTime + userTime) / 1000);  // ms 取毫秒

@@ -1,53 +1,62 @@
 $ErrorActionPreference = 'Stop'
 
-function log
-{
-    [CmdletBinding()]
-    Param
-    (
-        [Parameter(Mandatory = $true, Position = 0)]
-        [string]$LogMessage
-    )
-    Write-Output ("[{0}] {1}" -f (Get-Date), $LogMessage)
+function log($logContent){
+    Write-Host ("[{0}] {1}" -f (Get-Date), $logContent)
 }
-$id = Get-Content magisk/module.prop | Where-Object { $_ -match "id=" }
-$id = $id.split('=')[1]
-$version = Get-Content magisk/module.prop | Where-Object { $_ -match "version=" }
-$version = $version.split('=')[1]
-$versionCode = Get-Content magisk/module.prop | Where-Object { $_ -match "versionCode=" }
-$versionCode = $versionCode.split('=')[1]
+
+function abort($logContent){
+    Write-Host ("[{0}] {1}" -f (Get-Date), $logContent) -ForegroundColor:Red 
+    exit -1
+}
+
+$moduleProp = Get-Content magisk/module.prop
+$id = ($moduleProp | Where-Object { $_ -match "id=" }).split('=')[1]
+$version = ($moduleProp | Where-Object { $_ -match "version=" }).split('=')[1]
+$versionCode = ($moduleProp | Where-Object { $_ -match "versionCode=" }).split('=')[1]
 $zipFile = "${id}_v${version}.zip"
 
-$windowsToolchainsDir = "D:/AndroidSDK/ndk/25.2.9519653/toolchains/llvm/prebuilt/windows-x86_64/bin"
-$clang = "${windowsToolchainsDir}/clang++.exe"
-$target = "--target=aarch64-none-linux-android29"
-$sysroot = "--sysroot=D:/AndroidSDK/ndk/25.2.9519653/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
+$releaseDir = "D:/Project-github/freezeitRelease"
+
+$ndkPath = "D:/AndroidSDK/ndk/android-ndk-r26b"
+$clang = "${ndkPath}/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe"
+$sysroot = "--sysroot=${ndkPath}/toolchains/llvm/prebuilt/windows-x86_64/sysroot"
 $cppFlags = "-std=c++20 -static -s -Ofast -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
 
-log "Compiler..."
-& $clang $target $sysroot $cppFlags.Split(' ') -Iinclude src/main.cpp -o magisk/${id}
+
+log "Compiler... ARM64"
+$target = "--target=aarch64-none-linux-android31"
+& $clang $target $sysroot $cppFlags.Split(' ') -Iinclude src/main.cpp -o magisk/${id}ARM64
 if (-not$?)
 {
-    log "Compiler fail"
-    exit
+    abort "Compiler ARM64 fail"
+}
+
+log "Compiler... X64"
+$target = "--target=x86_64-none-linux-android31"
+& $clang $target $sysroot $cppFlags.Split(' ') -Iinclude src/main.cpp -o magisk/${id}X64
+if (-not$?)
+{
+    abort "Compiler X64 fail"
 }
 
 Copy-Item changelog.txt magisk -force
 
 
-$releaseDir = "D:/Project-github/freezeitRelease"
 if ((Test-Path $releaseDir) -ne "True")
 {
-    log "None Path: $releaseDir"
-    exit
+    abort "None Path: $releaseDir"
 }
 
-log "Packing... $zipFile"
-& ./7za.exe a "${releaseDir}/${zipFile}" ./magisk/* | Out-Null
+log "Packing...  $zipFile"
+$zipPath="${releaseDir}/${zipFile}"
+if((Test-Path $zipPath) -eq "True"){
+    log "Delete old file: $zipPath"
+    del $zipPath
+}
+& ./7za.exe a "${zipPath}" ./magisk/* | Out-Null
 if (-not$?)
 {
-    log "Pack fail"
-    exit
+    abort "Pack fail"
 }
 
 # https://github.com/jark006/freezeitRelease/raw/main/$zipFile
@@ -55,7 +64,6 @@ if (-not$?)
 
 # https://raw.githubusercontent.com/jark006/freezeitRelease/main/$zipFile
 # https://raw.githubusercontent.com/jark006/freezeitRelease/main/changelog.txt
-# https://raw.githubusercontent.com/jark006/freezeitRelease/main/freezeit_v2.2.17.zip
 
 # https://raw.fastgit.org/jark006/freezeitRelease/main/$zipFile
 # https://raw.fastgit.org/jark006/freezeitRelease/main/changelog.txt
@@ -67,6 +75,9 @@ if (-not$?)
 
 # https://ghproxy.com/https://raw.githubusercontent.com/jark006/freezeitRelease/main/$zipFile
 # https://ghproxy.com/https://raw.githubusercontent.com/jark006/freezeitRelease/main/changelog.txt
+
+# https://external.githubfast.com/https/raw.githubusercontent.com/jark006/freezeitRelease/main/$zipFile
+# https://external.githubfast.com/https/raw.githubusercontent.com/jark006/freezeitRelease/main/changelog.txt
 
 log "Creating... update json"
 $jsonContent = "{

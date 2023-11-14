@@ -16,18 +16,8 @@
 #include "freezer.hpp"
 #include "server.hpp"
 
-const int TEST_CODE = 0;
-
-void test();
-
 int main(int argc, char **argv) {
-
-    if (TEST_CODE) {
-        test();
-        exit(0);
-    }
-
-    //先获取模块目录，下面Init开启守护线程后就不能获取了
+    //先获取模块当前目录，Init()开启守护线程后, 工作目录将切换到根目录 "/"
     char fullPath[1024] = {};
     auto pathPtr = realpath(argv[0], fullPath); 
 
@@ -35,8 +25,8 @@ int main(int argc, char **argv) {
 
     Freezeit freezeit(argc, string(pathPtr));
     Settings settings(freezeit);
-    ManagedApp managedApp(freezeit, settings);
     SystemTools systemTools(freezeit, settings);
+    ManagedApp managedApp(freezeit, settings);
     Doze doze(freezeit, settings, managedApp, systemTools);
     Freezer freezer(freezeit, settings, managedApp, systemTools, doze);
     Server server(freezeit, settings, managedApp, systemTools, doze, freezer);
@@ -49,6 +39,13 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void test() {
-    printf("Test\n");
-}
+/*
+TODO
+
+1. 识别状态栏播放控件为前台 参考开源APP listen1 lxmusic
+2. 进程冻结状态整合
+3. 一些应用解冻后无法进入下一个activity
+4. QQ解冻无网络
+
+*/
+

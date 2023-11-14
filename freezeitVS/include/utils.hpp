@@ -67,7 +67,6 @@ using std::mutex;
 
 using std::make_unique;
 using std::to_string;
-using std::move;
 
 
 // 配置编译选项 *****************
@@ -102,11 +101,9 @@ constexpr auto FORK_DOUBLE = 1;
 #define TXNS_PENDING_WHILE_FROZEN (4)
 
 enum class WORK_MODE : uint32_t {
-    GLOBAL_SIGSTOP = 0,
-    V1 = 1,
-    V1_ST = 2,
-    V2UID = 3,
-    V2FROZEN = 4,
+    V2FROZEN = 0,
+    V2UID = 1,
+    GLOBAL_SIGSTOP = 2,
 };
 
 enum class FREEZE_MODE : uint32_t {
@@ -119,15 +116,20 @@ enum class FREEZE_MODE : uint32_t {
     WHITEFORCE = 50,
 };
 
+// 1359322925 是 "Freezeit" 的10进制CRC32值
+const int baseCode = 1359322925;
+
 enum class XPOSED_CMD : uint32_t {
-    // 1359322925 是 "Freezeit" 的10进制CRC32值
-    GET_FOREGROUND = 1359322925 + 1,
-    GET_SCREEN = 1359322925 + 2,
+    GET_FOREGROUND = baseCode + 1,
+    GET_SCREEN = baseCode + 2,
+    GET_XP_LOG = baseCode + 3,
 
-    SET_CONFIG = 1359322925 + 20,
-    SET_WAKEUP_LOCK = 1359322925 + 21,
+    SET_CONFIG = baseCode + 20,
+    SET_WAKEUP_LOCK = baseCode + 21,
 
-    BREAK_NETWORK = 1359322925 + 41,
+    BREAK_NETWORK = baseCode + 41,
+
+    UPDATE_PENDING = baseCode + 60,   // 更新待冻结应用
 };
 
 enum class REPLY : uint32_t {
@@ -150,6 +152,7 @@ enum class MANAGER_CMD : uint32_t {
     getRealTimeInfo = 6, // return ImgBytes[h*w*4]+String: (rawBitmap + 内存 频率 使用率 电流)
     getSettings = 8,     // return bytes[256]: all settings parameter
     getUidTime = 9,      // return "uid last_user_time last_sys_time user_time sys_time\n..."
+    getXpLog = 10,
 
     // 设置 需附加数据
     setAppCfg = 21,      // send "package x\npackage x\npackage x\n..."
@@ -194,8 +197,8 @@ struct uidTimeStruct {
 struct appInfoStruct {
     int uid = -1;
     FREEZE_MODE freezeMode = FREEZE_MODE::FREEZER; // [10]:杀死 [20]:SIGSTOP [30]:freezer [40]:配置 [50]:内置
-    bool isTolerant = true;        // 宽容的 有前台服务也算前台
-    int failFreezeCnt = 0;         // 冻结失败计数
+    bool isPermissive = true;        // 宽容的 有前台服务也算前台
+    int delayCnt = 0;              // Binder冻结失败而延迟次数
     bool isSystemApp = true;       // 是否系统应用
     time_t startTimestamp = 0;     // 某次开始运行时刻
     time_t stopTimestamp = 0;      // 某次冻结运行时刻
@@ -229,7 +232,7 @@ struct appInfoStruct {
 
 struct cfgStruct {
     FREEZE_MODE freezeMode = FREEZE_MODE::FREEZER;
-    bool isTolerant = true;
+    bool isPermissive = true;
 };
 
 template<size_t CAPACITY=32>
@@ -243,14 +246,28 @@ public:
 
     stackString() { data[0] = 0; }
     stackString(const string_view& s) {
-        memcpy(data, s.data(), s.length());
-        length = s.length();
-        data[length] = 0;
+        if (s.length() >= CAPACITY - 1) {
+            memcpy(data, s.data(), CAPACITY - 1);
+            length = CAPACITY - 1;
+            data[CAPACITY - 1] = 0;
+        }
+        else {
+            memcpy(data, s.data(), s.length());
+            length = s.length();
+            data[length] = 0;
+        }
     }
     stackString(const char* s, const size_t len) {
-        memcpy(data, s, len);
-        length = len;
-        data[length] = 0;
+        if (len >= CAPACITY - 1) {
+            memcpy(data, s, CAPACITY - 1);
+            length = CAPACITY - 1;
+            data[CAPACITY - 1] = 0;
+        }
+        else {
+            memcpy(data, s, len);
+            length = len;
+            data[length] = 0;
+        }
     }
 
     stackString& append(const int n) {
@@ -529,10 +546,14 @@ namespace Utils {
 
 
     void printException(
-        const char* versionStr, 
-        const int exceptionCnt, 
+        const char* versionStr,
+        const int exceptionCnt,
         const char* exceptionBuf,
-        const size_t bufSize) {
+        size_t bufSize = 0) {
+
+        if (bufSize == 0)
+            bufSize = strlen(exceptionBuf);
+
         auto fp = fopen("/sdcard/Android/freezeit_crash_log.txt", "ab");
         if (!fp) return;
 
@@ -553,21 +574,18 @@ namespace Utils {
 
 
     void Init() {
-        auto now = std::chrono::system_clock::now();
-        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-        srand(ns);
+        srand(std::chrono::system_clock::now().time_since_epoch().count());
         usleep(1000 * (rand() & 0x7ff)); //随机休眠 1ms ~ 2s
 
         // 检查是否还有其他freezeit进程，防止进程多开
         char buf[256] = { 0 };
         if (popenRead("pidof freezeit", buf, sizeof(buf)) == 0) {
-            printException(nullptr, 0, "进程检测失败", 18);
+            printException(nullptr, 0, "进程检测失败");
             exit(-1);
         }
 
         auto ptr = strchr(buf, ' ');
         if (ptr) { // "pidNum1 pidNum2 ..."  如果存在多个pid就退出
-            *ptr = 0;
             char tips[256];
             auto len = snprintf(tips, sizeof(tips),
                 "冻它已经在运行(pid: %s), 当前进程(pid:%d)即将退出，"
@@ -584,7 +602,7 @@ namespace Utils {
         pid_t pid = fork();
 
         if (pid < 0) { //创建失败
-            printException(nullptr, 0, "脱离终端Fork失败", 22);
+            printException(nullptr, 0, "脱离终端Fork失败");
             exit(-1);
         }
         else if (pid > 0) { //父进程返回的是 子进程的pid
@@ -601,7 +619,7 @@ namespace Utils {
 
         pid = fork(); //成为守护进程后再次Fork, 父进程监控， 子进程工作
         if (pid < 0) {
-            printException(nullptr, 0, "创建工作进程Fork失败", 28);
+            printException(nullptr, 0, "创建工作进程Fork失败");
             exit(-1);
         }
         else if (pid > 0) { //父进程 监控子进程输出的异常信息，并写到异常日志
@@ -627,9 +645,9 @@ namespace Utils {
 
                 if (zeroCnt >= 3 || exceptionCnt >= 1000) {
                     if (zeroCnt >= 3)
-                        printException(versionStr, 0, "工作进程已异常退出", 27);
+                        printException(versionStr, 0, "工作进程已异常退出");
                     else
-                        printException(versionStr, 0, "工作进程已达最大异常次数, 即将强制关闭", 56);
+                        printException(versionStr, 0, "工作进程已达最大异常次数, 即将强制关闭");
 
                     if (kill(pid, SIGKILL) < 0) {
                         char tips[128];

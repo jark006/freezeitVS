@@ -19,14 +19,7 @@ private:
     string propPath;
     string changelog{ "无" };
 
-    map<string, string> prop{
-            {"id",          "Unknown"},
-            {"name",        "Unknown"},
-            {"version",     "Unknown"},
-            {"versionCode", "0"},
-            {"author",      "Unknown"},
-            {"description", "Unknown"},
-    };
+    uint8_t* deBugFlagPtr = nullptr;
 
     // "Jul 28 2022" --> "2022-07-28"
     const char compilerDate[12] = {
@@ -219,22 +212,24 @@ private:
         fclose(fp);
     }
 
+
 public:
 
     bool isSamsung{ false };
     bool isOppoVivo{ false };
 
-    int ANDROID_VER = 0;
-    int SDK_INT_VER = 0;
-    KernelVersionStruct kernelVersion;
 
     string modulePath;
     string moduleEnv{ "Unknown" };
-    string workMode{ "Unknown" };
-    string kernelVerStr{ "Unknown" };
-    string androidVerStr{ "Unknown" };
 
-    uint32_t extMemorySize{ 0 };
+    map<string, string> prop{
+            {"id",          "Unknown"},
+            {"name",        "Unknown"},
+            {"version",     "Unknown"},
+            {"versionCode", "0"},
+            {"author",      "Unknown"},
+            {"description", "Unknown"},
+    };
 
     Freezeit& operator=(Freezeit&&) = delete;
 
@@ -291,7 +286,7 @@ public:
             exit(-1);
         }
 
-        char tmp[1024*4];
+        char tmp[1024 * 4];
         while (!feof(fp)) {
             fgets(tmp, sizeof(tmp), fp);
             if (!isalpha(tmp[0])) continue;
@@ -318,27 +313,10 @@ public:
         logFmt("%s", authorInfo);
         Utils::myDecode(authorInfo, sizeof(authorInfo));
 
-        logFmt("模块版本 %s", prop["version"].c_str());
+        logFmt("模块版本 %s(%s)", prop["version"].c_str(), prop["versionCode"].c_str());
         logFmt("编译时间 %s %s UTC+8", compilerDate, __TIME__);
 
         fprintf(stderr, "version %s", prop["version"].c_str()); // 发送当前版本信息给监控进程
-
-        ANDROID_VER = __system_property_get("ro.build.version.release", tmp) > 0 ? atoi(tmp) : 0;
-        SDK_INT_VER = __system_property_get("ro.build.version.sdk", tmp) > 0 ? atoi(tmp) : 0;
-        androidVerStr = to_string(ANDROID_VER) + " (API " + to_string(SDK_INT_VER) + ")";
-
-        utsname kernelInfo{};
-        if (!uname(&kernelInfo)) {
-            sscanf(kernelInfo.release, "%d.%d.%d", &kernelVersion.main, &kernelVersion.sub,
-                &kernelVersion.patch);
-            kernelVerStr =
-                to_string(kernelVersion.main) + "." + to_string(kernelVersion.sub) + "." +
-                to_string(kernelVersion.patch);
-            logFmt("内核版本 %d.%d.%d", kernelVersion.main, kernelVersion.sub, kernelVersion.patch);
-        }
-        else {
-            log("内核版本 获取异常");
-        }
 
         char res[256];
         if (__system_property_get("gsm.operator.alpha", res) > 0 && res[0] != ',')
@@ -362,6 +340,16 @@ public:
         if (__system_property_get("ro.soc.manufacturer", res) > 0 &&
             __system_property_get("ro.soc.model", res + 100) > 0)
             logFmt("硬件平台 %s %s", res, res + 100);
+    }
+
+    void setDebugPtr(uint8_t* ptr) {
+        deBugFlagPtr = ptr;
+    }
+    bool isDebugOn() {
+        if (deBugFlagPtr == nullptr)
+            return false;
+
+        return *deBugFlagPtr;
     }
 
     char* getChangelogPtr() { return (char*)changelog.c_str(); }
@@ -415,28 +403,14 @@ public:
         return (writeLen == len);
     }
 
-    void setWorkMode(const string& mode) {
-        workMode = mode;
-    }
 
-    size_t formatProp(char* ptr, const size_t maxSize, const int cpuCluster) {
-        return snprintf(ptr, maxSize, "%s\n%s\n%s\n%s\n%s\n%d\n%s\n%s\n%s\n%s\n%u",
-            prop["id"].c_str(), prop["name"].c_str(), prop["version"].c_str(),
-            prop["versionCode"].c_str(), prop["author"].c_str(),
-            cpuCluster, moduleEnv.c_str(), workMode.c_str(),
-            androidVerStr.c_str(), kernelVerStr.c_str(), extMemorySize);
-    }
-
-    void log(const string& logContent) {
-        log(logContent.c_str());
-    }
-    void formatTime() {
+    int formatTimePrefix() {
         time_t timeStamp = time(nullptr) + 8 * 3600L;
         int hour = (timeStamp / 3600) % 24;
         int min = (timeStamp % 3600) / 60;
         int sec = timeStamp % 60;
 
-        //lineCache[LINE_SIZE] = "[00:00:00]  ";
+        //lineCache[LINE_SIZE] = "[00:00:00] ";
         lineCache[1] = (hour / 10) + '0';
         lineCache[2] = (hour % 10) + '0';
         lineCache[4] = (min / 10) + '0';
@@ -444,15 +418,76 @@ public:
         lineCache[7] = (sec / 10) + '0';
         lineCache[8] = (sec % 10) + '0';
 
+        return 11;
     }
-    void log(const char* str) {
+
+    int formatTimeDebug() {
+        time_t timeStamp = time(nullptr) + 8 * 3600L;
+        int hour = (timeStamp / 3600) % 24;
+        int min = (timeStamp % 3600) / 60;
+        int sec = timeStamp % 60;
+
+        //lineCache[LINE_SIZE] = "[00:00:00] DEBUG ";
+        lineCache[1] = (hour / 10) + '0';
+        lineCache[2] = (hour % 10) + '0';
+        lineCache[4] = (min / 10) + '0';
+        lineCache[5] = (min % 10) + '0';
+        lineCache[7] = (sec / 10) + '0';
+        lineCache[8] = (sec % 10) + '0';
+
+        memcpy(lineCache + 11, "DEBUG ", 6);
+
+        return 17;
+    }
+
+    void log(const string_view& str) {
         lock_guard<mutex> lock(logPrintMutex);
 
-        formatTime();
+        const int prefixLen = formatTimePrefix();
 
-        auto len = strlen(str);
-        memcpy(lineCache + 11, str, len);
-        len += 11;
+        int len = str.length() + prefixLen;
+        memcpy(lineCache + prefixLen, str.data(), str.length());
+
+        lineCache[len++] = '\n';
+
+        if (toFileFlag)
+            toFile(lineCache, len);
+        else
+            toMem(lineCache, len);
+    }
+
+
+    template<typename... Args>
+    void logFmt(const char* fmt, Args&&... args) {
+        lock_guard<mutex> lock(logPrintMutex);
+
+        const int prefixLen = formatTimePrefix();
+
+        int len = snprintf(lineCache + prefixLen, (size_t)(LINE_SIZE - prefixLen), fmt, std::forward<Args>(args)...) + prefixLen;
+
+        if (len <= 11 || LINE_SIZE <= (len + 1)) {
+            lineCache[11] = 0;
+            fprintf(stderr, "日志异常: len[%d] lineCache[%s]", len, lineCache);
+            return;
+        }
+
+        lineCache[len++] = '\n';
+
+        if (toFileFlag)
+            toFile(lineCache, len);
+        else
+            toMem(lineCache, len);
+    }
+
+    void debug(const string_view& str) {
+        if (!isDebugOn())return;
+
+        lock_guard<mutex> lock(logPrintMutex);
+
+        const int prefixLen = formatTimeDebug();
+
+        int len = str.length() + prefixLen;
+        memcpy(lineCache + prefixLen, str.data(), str.length());
 
         lineCache[len++] = '\n';
 
@@ -463,15 +498,17 @@ public:
     }
 
     template<typename... Args>
-    void logFmt(const char* fmt, Args&&... args) {
+    void debugFmt(const char* fmt, Args&&... args) {
+        if (!isDebugOn())return;
+
         lock_guard<mutex> lock(logPrintMutex);
 
-        formatTime();
+        const int prefixLen = formatTimeDebug();
 
-        int len = snprintf(lineCache + 11, (size_t)(LINE_SIZE - 11), fmt, std::forward<Args>(args)...) + 11;
+        int len = snprintf(lineCache + prefixLen, (size_t)(LINE_SIZE - prefixLen), fmt, std::forward<Args>(args)...) + prefixLen;
 
-        if (len <= 11 || LINE_SIZE <= (len + 1)) {
-            lineCache[11] = 0;
+        if (len <= 13 || LINE_SIZE <= (len + 1)) {
+            lineCache[13] = 0;
             fprintf(stderr, "日志异常: len[%d] lineCache[%s]", len, lineCache);
             return;
         }

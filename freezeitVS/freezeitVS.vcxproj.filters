@@ -13,6 +13,9 @@
     <Filter Include="note">
       <UniqueIdentifier>{1a760ced-43ba-40bd-80c9-0b28084f4b05}</UniqueIdentifier>
     </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{507f1c27-d4da-483a-940f-c6247d51c6c8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
@@ -47,6 +50,7 @@
     </None>
     <None Include="build_ARM64.ps1" />
     <None Include="build_X64.ps1" />
+    <None Include="build_test.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="changelog.txt" />
@@ -115,6 +119,9 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="test\test.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\doze.hpp">
@@ -143,6 +150,9 @@
     </ClInclude>
     <ClInclude Include="include\vpopen.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="test\inc.h">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -27,31 +27,73 @@ private:
 
 public:
     // 各核心 曲线颜色 ABGR
-    const uint32_t* COLOR_CPU = COLOR_CLUSTER[0];
-    int cpuCluster = 0;
-    int cpuCoreAll = 0;
-    int cpuCoreValid = 0;
-    uint32_t cycleCnt = 0;
+    //const uint32_t* COLOR_CPU = COLOR_CLUSTER[0];
+    const uint32_t COLOR_CPU[16] = {
+
+        //#22B8DD, #22DDB8, #22DD6D, #92DD22,  #E6E61A,#E6BD1A, #E66B1A, ##E61A1A
+
+        0xffddb822, 0xffb8dd22, 0xff6ddd22, 0xff22dd92, 0xff1ae6e6, 0xff1abde6, 0xff1a6be6, 0xff1a1ae6,
+        0xffddb822, 0xffb8dd22, 0xff6ddd22, 0xff22dd92, 0xff1ae6e6, 0xff1abde6, 0xff1a6be6, 0xff1a1ae6,
+
+    };
+    int cpuCluster = 0;    // 44(4+4), 431(4+3+1), 62(6+2) ...
+    int cpuCoreTotal = 0;  // 全部核心数量
+    int cpuCoreOnline = 0; // 当前可用核心数量
+    uint32_t cycleCnt = 0; // 核心循环计数，约每秒+1
 
     MemInfoStruct memInfo;
 
-    int cpuTemperature{ 0 };
-    int batteryWatt{ 0 };
+    int cpuTemperature = 0;
+    int batteryWatt = 0;
 
-    int cpuBucketIdx{ 0 };
-    static constexpr int maxBucketSize = 32;
-    cpuRealTimeStruct cpuRealTime[maxBucketSize][9] = {}; // idx[8] 是CPU总使用率 // 最大 100   100%
+    int cpuBucketIdx = 0; // 当前 循环索引 的位置
+    static constexpr int maxBucketSize = 32; // CPU历史记录数量
+    cpuRealTimeStruct cpuRealTimeSumary[maxBucketSize] = {};   // CPU总使用率
+    cpuRealTimeStruct cpuRealTimeCore[maxBucketSize][16] = {}; // CPU各核心使用率  最多16核 最大 100%
 
     char cpuTempPath[256] = "/sys/class/thermal/thermal_zone0/temp";
 
     bool isAudioPlaying = false;
     // bool isMicrophoneRecording = false;
 
+    uint32_t extMemorySize = 0; // MiB
+
+    int ANDROID_VER = 0;
+    int SDK_INT_VER = 0;
+    KernelVersionStruct kernelVersion;
+    string kernelVerStr{ "Unknown" };
+    string androidVerStr{ "Unknown" };
 
     SystemTools& operator=(SystemTools&&) = delete;
 
     SystemTools(Freezeit& freezeit, Settings& settings) :
         freezeit(freezeit), settings(settings) {
+
+        char tmp[1024];
+        ANDROID_VER = __system_property_get("ro.build.version.release", tmp) > 0 ? atoi(tmp) : 0;
+        SDK_INT_VER = __system_property_get("ro.build.version.sdk", tmp) > 0 ? atoi(tmp) : 0;
+        androidVerStr = to_string(ANDROID_VER) + " (API " + to_string(SDK_INT_VER) + ")";
+
+        freezeit.logFmt("安卓版本 %s", androidVerStr.c_str());
+
+        utsname kernelInfo{};
+        if (!uname(&kernelInfo)) {
+            sscanf(kernelInfo.release, "%d.%d.%d", &kernelVersion.main, &kernelVersion.sub,
+                &kernelVersion.patch);
+            kernelVerStr = to_string(kernelVersion.main) + "." + to_string(kernelVersion.sub) + "." + to_string(kernelVersion.patch);
+            freezeit.logFmt("内核版本 %d.%d.%d", kernelVersion.main, kernelVersion.sub, kernelVersion.patch);
+        }
+        else {
+            Utils::printException(nullptr, 0, "无法获取内核版本", 24);
+            exit(0);
+        }
+
+        int kVersion = kernelVersion.main * 100 + kernelVersion.sub;
+        if (kVersion < 510) {
+            int len = snprintf(tmp, sizeof(tmp), "冻它不支持当前内核版本 %s", kernelInfo.release);
+            Utils::printException(nullptr, 0, tmp, len);
+            exit(0);
+        }
 
         getCpuTempPath();
         InitCPU();
@@ -60,7 +102,7 @@ public:
 
         sndThread = thread(&SystemTools::sndThreadFunc, this);
 
-        freezeit.extMemorySize = getExtMemorySize();
+        extMemorySize = getExtMemorySize();
     }
 
     size_t formatRealTime(int* ptr) {
@@ -71,12 +113,12 @@ public:
         ptr[i++] = memInfo.totalSwap;
         ptr[i++] = memInfo.freeSwap;
 
-        for (int coreIdx = 0; coreIdx < 8; coreIdx++)
-            ptr[i++] = cpuRealTime[cpuBucketIdx][coreIdx].freq;
-        for (int coreIdx = 0; coreIdx < 8; coreIdx++)
-            ptr[i++] = cpuRealTime[cpuBucketIdx][coreIdx].usage;
+        for (int coreIdx = 0; coreIdx < cpuCoreTotal; coreIdx++)
+            ptr[i++] = cpuRealTimeCore[cpuBucketIdx][coreIdx].freq;
+        for (int coreIdx = 0; coreIdx < cpuCoreTotal; coreIdx++)
+            ptr[i++] = cpuRealTimeCore[cpuBucketIdx][coreIdx].usage;
 
-        ptr[i++] = cpuRealTime[cpuBucketIdx][8].usage;
+        ptr[i++] = cpuRealTimeSumary[cpuBucketIdx].usage;
         ptr[i++] = cpuTemperature;
         ptr[i] = batteryWatt;
 
@@ -90,20 +132,85 @@ public:
         struct stat statBuf { };
         if (!access(filePathMIUI, F_OK)) {
             stat(filePathMIUI, &statBuf);
-            if (statBuf.st_size > 1024)
+            if (statBuf.st_size > 1024 * 1024L)
                 return statBuf.st_size >> 20;// bytes -> MiB
         }
         else if (!access(filePathCOS, F_OK)) {
             stat(filePathCOS, &statBuf);
-            if (statBuf.st_size > 1024)
+            if (statBuf.st_size > 1024 * 1024L)
                 return statBuf.st_size >> 20;// bytes -> MiB
         }
 
         return 0;
     }
 
+
+//    std::string GetProperty(const std::string& key, const std::string& default_value) {
+//        std::string property_value;
+//#if defined(__BIONIC__)
+//        const prop_info* pi = __system_property_find(key.c_str());
+//        if (pi == nullptr) return default_value;
+//
+//        __system_property_read_callback(pi,
+//            [](void* cookie, const char*, const char* value, unsigned) {
+//                auto property_value = reinterpret_cast<std::string*>(cookie);
+//                *property_value = value;
+//            },
+//            &property_value);
+//#else
+//        auto it = g_properties.find(key);
+//        if (it == g_properties.end()) return default_value;
+//        property_value = it->second;
+//#endif
+//        // If the property exists but is empty, also return the default value.
+//        // Since we can't remove system properties, "empty" is traditionally
+//        // the same as "missing" (this was true for cutils' property_get).
+//        return property_value.empty() ? default_value : property_value;
+//    }
+
+    // 不适合频繁查找
+    int GetProperty(const char* key, char* res) {
+        const prop_info* pi = __system_property_find(key); //如果频繁使用，建议缓存 对应Key的 prop_info
+        if (pi == nullptr) {
+            res[0] = 0;
+            return -1;
+        }
+
+        __system_property_read_callback(pi,
+            [](void* cookie, const char*, const char* value, unsigned) {
+                if (value[0])
+                    strncpy((char*)cookie, value, PROP_VALUE_MAX);
+                else  ((char*)cookie)[0] = 0;
+            },
+            res);
+
+        return res[0] ? 1 : -1;
+    }
+
+    int getScreenProperty() {
+        static const prop_info* pi = nullptr;
+
+        if (pi == nullptr) {
+            pi = __system_property_find("debug.tracing.screen_state");
+            if (pi == nullptr) {
+                return -1;
+            }
+        }
+
+        char res[PROP_VALUE_MAX] = { 0 };
+        __system_property_read_callback(pi,
+            [](void* cookie, const char*, const char* value, unsigned) {
+                if (value[0])
+                    strncpy((char*)cookie, value, PROP_VALUE_MAX);
+                else  ((char*)cookie)[0] = 0;
+            },
+            res);
+
+        return res[0] ? res[0] - '0' : -1;
+    }
+
     void InitLMK() {
-        if (!settings.enableLMK || freezeit.SDK_INT_VER < 30 || freezeit.SDK_INT_VER > 35)
+        if (!settings.enableLMK || SDK_INT_VER < 30 || SDK_INT_VER > 35)
             return;
 
         // https://cs.android.com/android/platform/superproject/+/master:system/memory/lmkd/lmkd.cpp
@@ -180,7 +287,7 @@ public:
     map<uint32_t, uint32_t> getCpuCluster() {
         map < uint32_t, uint32_t > freqMap;
         char path[] = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq";
-        for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
+        for (int coreIdx = 0; coreIdx < cpuCoreTotal; coreIdx++) {
             path[27] = '0' + coreIdx;
             freqMap[Utils::readInt(path)]++;
         }
@@ -278,44 +385,13 @@ public:
 
 
     void InitCPU() {
-
-        const auto res = getCpuCluster();
-        cpuCluster = 0;
-        for (const auto& [freq, num] : res)
-            cpuCluster = cpuCluster * 10 + num;
-
-        if (cpuCluster && res.size() < 10) {
-            stackString<256> str("核心频率");
-            for (const auto& [freq, cnt] : res)
-                str.appendFmt(" %.2fGHz*%d", freq / (freq > 1e8 ? 1e9 : 1e6), cnt);
-            freezeit.log(*str);
-        }
-
-        switch (cpuCluster) {
-        case 431:
-            COLOR_CPU = COLOR_CLUSTER[1];
-            break;
-        case 422:
-            COLOR_CPU = COLOR_CLUSTER[2];
-            break;
-        case 3221:
-            COLOR_CPU = COLOR_CLUSTER[3];
-            break;
-        case 62:
-            COLOR_CPU = COLOR_CLUSTER[4];
-            break;
-        case 251:
-            COLOR_CPU = COLOR_CLUSTER[5];
-            break;
-        }
-
-        cpuCoreAll = sysconf(_SC_NPROCESSORS_CONF);
-        cpuCoreValid = sysconf(_SC_NPROCESSORS_ONLN);
-        freezeit.logFmt("全部核心 %d 可用核心 %d", cpuCoreAll, cpuCoreValid);
-        if (cpuCoreAll != cpuCoreValid) {
+        cpuCoreTotal = sysconf(_SC_NPROCESSORS_CONF);
+        cpuCoreOnline = sysconf(_SC_NPROCESSORS_ONLN);
+        freezeit.logFmt("全部核心 %d 可用核心 %d", cpuCoreTotal, cpuCoreOnline);
+        if (cpuCoreTotal != cpuCoreOnline) {
             stackString<128> tips("当前离线核心 ");
             char tmp[64];
-            for (int i = 0; i < cpuCoreAll; i++) {
+            for (int i = 0; i < cpuCoreTotal; i++) {
                 snprintf(tmp, sizeof(tmp), "/sys/devices/system/cpu/cpu%d/online", i);
                 auto fd = open(tmp, O_RDONLY);
                 if (fd < 0)continue;
@@ -324,12 +400,49 @@ public:
                 if (tmp[0] == '0')
                     tips.append("[", 1).append(i).append("]", 1);
             }
-            freezeit.log(tips.c_str());
+            freezeit.log(string_view(tips.c_str(), tips.length));
         }
-        if (cpuCoreValid > 16) {
-            cpuCoreValid = 16;
-            freezeit.log("核心数量超过16, 部分功能可能不受支持");
+        if (cpuCoreTotal > 32) {
+            cpuCoreTotal = 32;
+            freezeit.log("处理器大于32线程, 曲线表将只绘制前 32 线程使用率");
         }
+        if (cpuCoreOnline > 32) {
+            cpuCoreOnline = 32;
+        }
+
+
+        const auto res = getCpuCluster();
+        cpuCluster = 0;
+        for (const auto& [freq, num] : res)
+            cpuCluster = cpuCluster * 10 + num;
+
+        if (cpuCluster && res.size() < 10) {
+            stackString<256> tmp("核心频率");
+            for (const auto& [freq, cnt] : res)
+                tmp.appendFmt(" %.2fGHz*%d", freq / (freq > 1e8 ? 1e9 : 1e6), cnt);
+            freezeit.log(string_view(tmp.c_str(), tmp.length));
+        }
+        else {
+            freezeit.logFmt("核心频率获取失败 cpuCluster %d size %d", cpuCluster, res.size());
+        }
+
+        //switch (cpuCluster) {
+        //case 431:
+        //    COLOR_CPU = COLOR_CLUSTER[1];
+        //    break;
+        //case 422:
+        //    COLOR_CPU = COLOR_CLUSTER[2];
+        //    break;
+        //case 3221:
+        //    COLOR_CPU = COLOR_CLUSTER[3];
+        //    break;
+        //case 62:
+        //    COLOR_CPU = COLOR_CLUSTER[4];
+        //    break;
+        //case 251:
+        //    COLOR_CPU = COLOR_CLUSTER[5];
+        //    break;
+        //}
     }
 
     uint32_t drawChart(uint32_t* imgBuf, uint32_t height, uint32_t width) {
@@ -399,23 +512,55 @@ public:
             }
         }
 
-        for (int minuteIdx = 1; minuteIdx < maxBucketSize; minuteIdx++) {
-            for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
-                uint32_t y0 =
-                    (100 - cpuRealTime[(cpuBucketIdx + minuteIdx) & 0x1f][coreIdx].usage) *
+        //for (int minuteIdx = 1; minuteIdx < maxBucketSize; minuteIdx++) {
+        //    for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
+        //        uint32_t y0 =
+        //            (100 - cpuRealTimeCore[(cpuBucketIdx + minuteIdx) & 0x1f][coreIdx].usage) *
+        //            imgHeight / 100;
+        //        uint32_t y1 =
+        //            (100 - cpuRealTimeCore[(cpuBucketIdx + minuteIdx + 1) & 0x1f][coreIdx].usage) *
+        //            imgHeight / 100;
+
+        //        if (y0 <= 0) y0 = 1;
+        //        else if (y0 >= imgHeight) y0 = imgHeight - 1;
+
+        //        if (y1 <= 0) y1 = 1;
+        //        else if (y1 >= imgHeight) y1 = imgHeight - 1;
+
+        //        drawLine(imgBuf, width, COLOR_CPU[coreIdx], (width * (minuteIdx - 1)) / 31, y0,
+        //            (width * minuteIdx) / 31, y1);
+        //    }
+        //}
+
+        for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
+            for (int minuteIdx = 1; minuteIdx < maxBucketSize; minuteIdx++) {
+                int y0 =
+                    (100 - cpuRealTimeCore[(cpuBucketIdx + minuteIdx) & 0x1f][coreIdx].usage) *
                     imgHeight / 100;
-                uint32_t y1 =
-                    (100 - cpuRealTime[(cpuBucketIdx + minuteIdx + 1) & 0x1f][coreIdx].usage) *
+                int y1 =
+                    (100 - cpuRealTimeCore[(cpuBucketIdx + minuteIdx+1) & 0x1f][coreIdx].usage) *
                     imgHeight / 100;
 
                 if (y0 <= 0) y0 = 1;
-                else if (y0 >= imgHeight) y0 = imgHeight - 1;
+                else if ((uint32_t)y0 >= imgHeight) y0 = imgHeight - 1;
 
                 if (y1 <= 0) y1 = 1;
-                else if (y1 >= imgHeight) y1 = imgHeight - 1;
+                else if ((uint32_t)y1 >= imgHeight) y1 = imgHeight - 1;
 
-                drawLine(imgBuf, width, COLOR_CPU[coreIdx], (width * (minuteIdx - 1)) / 31, y0,
-                    (width * minuteIdx) / 31, y1);
+                int x0 = (width * (minuteIdx - 1)) / 31;
+                int x1 = (width * minuteIdx) / 31;
+                int pointHighLast = y0;
+                for (int x = x0; x < x1; x++) {
+                    int deltaUp = (x - x0) * (x - x0), deltaDown = (x1 - x) * (x1 - x);
+                    int pointHigh = y0 + (y1 - y0) * deltaUp / (deltaUp + deltaDown);
+
+                    int h = pointHighLast < pointHigh ? pointHighLast : pointHigh;
+                    const int maxH = pointHighLast > pointHigh ? pointHighLast : pointHigh;
+                    for (; h <= maxH; h++)
+                        imgBuf[width * h + x] = COLOR_CPU[coreIdx];
+
+                    pointHighLast = pointHigh;
+                }
             }
         }
 
@@ -478,8 +623,12 @@ public:
 
     void getCPU_realtime(const uint32_t availableMiB) {
         static char path[] = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
-        static uint32_t jiffiesSumLast[9] = {};
-        static uint32_t jiffiesIdleLast[9] = {};
+
+        static uint32_t jiffiesSumLastSumary = 0;
+        static uint32_t jiffiesIdleLastSumary = 0;
+
+        static uint32_t jiffiesSumLastCore[16] = {};
+        static uint32_t jiffiesIdleLastCore[16] = {};
 
         struct sysinfo s_info;
         if (!sysinfo(&s_info)) {
@@ -490,59 +639,78 @@ public:
             memInfo.freeSwap = s_info.freeswap >> 20;
         }
 
-        cpuBucketIdx = (cpuBucketIdx + 1) & 0b1'1111;  // %32 maxBucketSize
+        cpuBucketIdx = (cpuBucketIdx + 1) % maxBucketSize;
 
         // read frequency
-        for (int coreIdx = 0; coreIdx < 8; coreIdx++) {
+        for (int coreIdx = 0; coreIdx < cpuCoreTotal; coreIdx++) {
             path[27] = '0' + coreIdx;
-            cpuRealTime[cpuBucketIdx][coreIdx].freq = Utils::readInt(path) / 1000;// MHz
+            cpuRealTimeCore[cpuBucketIdx][coreIdx].freq = Utils::readInt(path) / 1000;// MHz
         }
 
         // read occupy
         auto fp = fopen("/proc/stat", "rb");
         if (fp) {
             char buff[256];
-            uint32_t jiffiesList[8]{ 0 };
+            uint32_t jiffiesList[8] = { 0 };
 
             while (true) {
                 fgets(buff, sizeof(buff), fp);
                 if (strncmp(buff, "cpu", 3))
                     break;
 
-                uint32_t coreIdx = 8; // 默认 总CPU数据放到 最后索引位置
+                int coreIdx = -1;
                 if (buff[3] == ' ') // 总CPU数据
                     sscanf(buff + 4, "%u %u %u %u %u %u %u",
                         jiffiesList + 0, jiffiesList + 1, jiffiesList + 2, jiffiesList + 3,
                         jiffiesList + 4, jiffiesList + 5, jiffiesList + 6);
                 else
-                    sscanf(buff + 3, "%u %u %u %u %u %u %u %u", &coreIdx,
+                    sscanf(buff + 3, "%d %u %u %u %u %u %u %u", &coreIdx,
                         jiffiesList + 0, jiffiesList + 1, jiffiesList + 2, jiffiesList + 3,
                         jiffiesList + 4, jiffiesList + 5, jiffiesList + 6);
 
-                if (coreIdx > 8) {
-                    freezeit.logFmt("CPU可能超过8核, 暂不支持: coreIdx:%d", coreIdx);
+                if (coreIdx >= cpuCoreTotal) {
+                    freezeit.logFmt("CPU核心 coreIdx:%d 超过核心数量 %d, 暂不支持", coreIdx, cpuCoreTotal);
                     break;
                 }
 
                 // user, nice, system, idle, iowait, irq, softirq
-                uint32_t jiffiesSum{ 0 };
+                uint32_t jiffiesSum = 0;
                 for (int jiffIdx = 0; jiffIdx < 7; jiffIdx++)
                     jiffiesSum += jiffiesList[jiffIdx];
 
                 uint32_t& jiffiesIdle = jiffiesList[3];
-                if (jiffiesSumLast[coreIdx] == 0) {
-                    jiffiesSumLast[coreIdx] = jiffiesSum;
-                    jiffiesIdleLast[coreIdx] = jiffiesIdle;
-                }
-                else {
-                    const uint32_t sumDelta = jiffiesSum - jiffiesSumLast[coreIdx];
-                    const uint32_t idleDelta = jiffiesIdle - jiffiesIdleLast[coreIdx];
-                    const int usage = (sumDelta == 0 || idleDelta == 0 || idleDelta > sumDelta) ?
-                        0 : (100 * (sumDelta - idleDelta) / sumDelta);
 
-                    cpuRealTime[cpuBucketIdx][coreIdx].usage = usage;
-                    jiffiesSumLast[coreIdx] = jiffiesSum;
-                    jiffiesIdleLast[coreIdx] = jiffiesIdle;
+                if (coreIdx == -1) { // CPU 综合数据
+                    if (jiffiesSumLastSumary == 0) {
+                        jiffiesSumLastSumary = jiffiesSum;
+                        jiffiesIdleLastSumary = jiffiesIdle;
+                    }
+                    else {
+                        const uint32_t sumDelta = jiffiesSum - jiffiesSumLastSumary;
+                        const uint32_t idleDelta = jiffiesIdle - jiffiesIdleLastSumary;
+                        const int usage = (sumDelta == 0 || idleDelta > sumDelta) ? 0 :
+                            (idleDelta == 0 ? 100 : (100 * (sumDelta - idleDelta) / sumDelta));
+
+                        cpuRealTimeSumary[cpuBucketIdx].usage = usage;
+                        jiffiesSumLastSumary = jiffiesSum;
+                        jiffiesIdleLastSumary = jiffiesIdle;
+                    }
+                }
+                else { // 各核心数据
+                    if (jiffiesSumLastCore[coreIdx] == 0) {
+                        jiffiesSumLastCore[coreIdx] = jiffiesSum;
+                        jiffiesIdleLastCore[coreIdx] = jiffiesIdle;
+                    }
+                    else {
+                        const uint32_t sumDelta = jiffiesSum - jiffiesSumLastCore[coreIdx];
+                        const uint32_t idleDelta = jiffiesIdle - jiffiesIdleLastCore[coreIdx];
+                        const int usage = (sumDelta == 0 || idleDelta > sumDelta) ? 0 :
+                            (idleDelta == 0 ? 100 : (100 * (sumDelta - idleDelta) / sumDelta));
+
+                        cpuRealTimeCore[cpuBucketIdx][coreIdx].usage = usage;
+                        jiffiesSumLastCore[coreIdx] = jiffiesSum;
+                        jiffiesIdleLastCore[coreIdx] = jiffiesIdle;
+                    }
                 }
             }
             fclose(fp);

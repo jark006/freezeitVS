@@ -41,9 +41,9 @@ private:
     const char* cgroupV2frozenCheckPath = "/sys/fs/cgroup/frozen/cgroup.freeze";       // "1" frozen
     const char* cgroupV2unfrozenCheckPath = "/sys/fs/cgroup/unfrozen/cgroup.freeze";   // "0" unfrozen
 
-    // const char cpusetEventPath[] = "/dev/cpuset/top-app";
-    const char* cpusetEventPathA12 = "/dev/cpuset/top-app/tasks";
-    const char* cpusetEventPathA13 = "/dev/cpuset/top-app/cgroup.procs";
+    const char* cpusetEventPath = "/dev/cpuset/top-app";
+    //const char* cpusetEventPathA12 = "/dev/cpuset/top-app/tasks";
+    //const char* cpusetEventPathA13 = "/dev/cpuset/top-app/cgroup.procs";
 
     const char* cgroupV1FrozenPath = "/dev/jark_freezer/frozen/cgroup.procs";
     const char* cgroupV1UnfrozenPath = "/dev/jark_freezer/unfrozen/cgroup.procs";
@@ -67,18 +67,6 @@ private:
 public:
     Freezer& operator=(Freezer&&) = delete;
 
-    const string workModeStr(const WORK_MODE mode) {
-        const string modeStrList[] = {
-                "全局SIGSTOP",
-                "FreezerV1 (FROZEN)",
-                "FreezerV1 (FRZ+ST)",
-                "FreezerV2 (UID)",
-                "FreezerV2 (FROZEN)",
-                "Unknown" };
-        const uint32_t idx = static_cast<uint32_t>(mode);
-        return modeStrList[idx <= 5 ? idx : 5];
-    }
-
     Freezer(Freezeit& freezeit, Settings& settings, ManagedApp& managedApp,
         SystemTools& systemTools, Doze& doze) :
         freezeit(freezeit), managedApp(managedApp), systemTools(systemTools),
@@ -93,51 +81,28 @@ public:
 
         checkAndMountV2();
         switch (static_cast<WORK_MODE>(settings.setMode)) {
-        case WORK_MODE::GLOBAL_SIGSTOP: {
-            workMode = WORK_MODE::GLOBAL_SIGSTOP;
-            freezeit.setWorkMode(workModeStr(workMode));
-            freezeit.log("已设置[全局SIGSTOP], [Freezer冻结]将变为[SIGSTOP冻结]");
-        } return;
-
-        case WORK_MODE::V1: {
-            if (mountFreezerV1()) {
-                workMode = WORK_MODE::V1;
-                freezeit.setWorkMode(workModeStr(workMode));
-                freezeit.log("Freezer类型已设为 V1(FROZEN)");
+        case WORK_MODE::V2FROZEN: {
+            if (checkFreezerV2FROZEN()) {
+                workMode = WORK_MODE::V2FROZEN;
+                freezeit.log("Freezer类型已设为 V2(FROZEN)");
                 return;
             }
-            freezeit.log("不支持自定义Freezer类型 V1(FROZEN) 失败");
-        } break;
-
-        case WORK_MODE::V1_ST: {
-            if (mountFreezerV1()) {
-                workMode = WORK_MODE::V1_ST;
-                freezeit.setWorkMode(workModeStr(workMode));
-                freezeit.log("Freezer类型已设为 V1(FRZ+ST)");
-                return;
-            }
-            freezeit.log("不支持自定义Freezer类型 V1(FRZ+ST)");
+            freezeit.log("不支持自定义Freezer类型 V2(FROZEN)");
         } break;
 
         case WORK_MODE::V2UID: {
             if (checkFreezerV2UID()) {
                 workMode = WORK_MODE::V2UID;
-                freezeit.setWorkMode(workModeStr(workMode));
                 freezeit.log("Freezer类型已设为 V2(UID)");
                 return;
             }
             freezeit.log("不支持自定义Freezer类型 V2(UID)");
         } break;
 
-        case WORK_MODE::V2FROZEN: {
-            if (checkFreezerV2FROZEN()) {
-                workMode = WORK_MODE::V2FROZEN;
-                freezeit.setWorkMode(workModeStr(workMode));
-                freezeit.log("Freezer类型已设为 V2(FROZEN)");
-                return;
-            }
-            freezeit.log("不支持自定义Freezer类型 V2(FROZEN)");
-        } break;
+        case WORK_MODE::GLOBAL_SIGSTOP: {
+            workMode = WORK_MODE::GLOBAL_SIGSTOP;
+            freezeit.log("已设置[全局SIGSTOP], [Freezer冻结]将变为[SIGSTOP冻结]");
+        } return;
         }
 
         // 以上手动选择若不支持或失败，下面将进行自动选择
@@ -149,19 +114,20 @@ public:
             workMode = WORK_MODE::V2UID;
             freezeit.log("Freezer类型已设为 V2(UID)");
         }
-        //else if (mountFreezerV1()) { // 部分V1不能内存释放，不再进行自动选择，只能手动选择
-        //	workMode = WORK_MODE::V1;
-        //	freezeit.log("Freezer类型已设为 V1(FROZEN)");
-        //}
         else {
             workMode = WORK_MODE::GLOBAL_SIGSTOP;
             freezeit.log("已开启 [全局SIGSTOP] 冻结模式");
         }
-        freezeit.setWorkMode(workModeStr(workMode));
     }
 
-    bool isV1Mode() const {
-        return workMode == WORK_MODE::V1_ST || workMode == WORK_MODE::V1;
+    const char* getCurWorkModeStr() {
+        switch (workMode)
+        {
+        case WORK_MODE::V2FROZEN:       return "FreezerV2 (FROZEN)";
+        case WORK_MODE::V2UID:          return "FreezerV2 (UID)";
+        case WORK_MODE::GLOBAL_SIGSTOP: return "全局SIGSTOP";
+        }
+        return "未知";
     }
 
     void getPids(appInfoStruct& appInfo) {
@@ -200,7 +166,7 @@ public:
             if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
             const string& package = appInfo.package;
             if (strncmp(readBuff, package.c_str(), package.length())) continue;
-            const char endChar = readBuff[package.length()];
+            const char endChar = readBuff[package.length()]; // 特例 com.android.chrome_zygote 无法binder冻结
             if (endChar != ':' && endChar != 0)continue;
 
             appInfo.pids.emplace_back(pid);
@@ -245,6 +211,8 @@ public:
             if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
             const string& package = managedApp[uid].package;
             if (strncmp(readBuff, package.c_str(), package.length())) continue;
+            const char endChar = readBuff[package.length()]; // 特例 com.android.chrome_zygote 无法binder冻结
+            if (endChar != ':' && endChar != 0)continue;
 
             pids[uid].emplace_back(pid);
         }
@@ -289,6 +257,8 @@ public:
             if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
             const string& package = managedApp[uid].package;
             if (strncmp(readBuff, package.c_str(), package.length())) continue;
+            const char endChar = readBuff[package.length()]; // 特例 com.android.chrome_zygote 无法binder冻结
+            if (endChar != ':' && endChar != 0)continue;
 
             uids.insert(uid);
         }
@@ -299,23 +269,24 @@ public:
 
     void handleSignal(const appInfoStruct& appInfo, const int signal) {
         if (signal == SIGKILL) {
-            if (isV1Mode() && appInfo.isFreezeMode())
-                handleFreezer(appInfo, false);  // 先给V1解冻， 否则无法杀死
-
             //先暂停 然后再杀，否则有可能会复活
-            for (const auto pid : appInfo.pids)
+            for (const auto pid : appInfo.pids) {
+                freezeit.debugFmt("暂停 [%s:%d]", appInfo.label.c_str(), pid);
                 kill(pid, SIGSTOP);
+            }
 
             usleep(1000 * 50);
-            for (const auto pid : appInfo.pids)
+            for (const auto pid : appInfo.pids) {
+                freezeit.debugFmt("终结 [%s:%d]", appInfo.label.c_str(), pid);
                 kill(pid, SIGKILL);
+            }
 
             return;
         }
 
         for (const int pid : appInfo.pids)
             if (kill(pid, signal) < 0 && signal == SIGSTOP)
-                freezeit.logFmt("SIGSTOP冻结 [%s PID:%d] 失败[%s]",
+                freezeit.logFmt("SIGSTOP冻结 [%s:%d] 失败[%s]",
                     appInfo.label.c_str(), pid, strerror(errno));
     }
 
@@ -336,37 +307,6 @@ public:
                 snprintf(path, sizeof(path), cgroupV2UidPidPath, appInfo.uid, pid);
                 if (!Utils::writeString(path, freeze ? "1" : "0", 2))
                     freezeit.logFmt("%s [%s PID:%d] 失败(进程可能已结束或者Freezer控制器尚未初始化PID路径)",
-                        freeze ? "冻结" : "解冻", appInfo.label.c_str(), pid);
-            }
-        } break;
-
-        case WORK_MODE::V1_ST: {
-            if (freeze) {
-                for (const int pid : appInfo.pids) {
-                    if (!Utils::writeInt(cgroupV1FrozenPath, pid))
-                        freezeit.logFmt("冻结 [%s PID:%d] 失败(V1_ST_F)",
-                            appInfo.label.c_str(), pid);
-                    if (kill(pid, SIGSTOP) < 0)
-                        freezeit.logFmt("冻结 [%s PID:%d] 失败(V1_ST_S)",
-                            appInfo.label.c_str(), pid);
-                }
-            }
-            else {
-                for (const int pid : appInfo.pids) {
-                    if (kill(pid, SIGCONT) < 0)
-                        freezeit.logFmt("解冻 [%s PID:%d] 失败(V1_ST_S)",
-                            appInfo.label.c_str(), pid);
-                    if (!Utils::writeInt(cgroupV1UnfrozenPath, pid))
-                        freezeit.logFmt("解冻 [%s PID:%d] 失败(V1_ST_F)",
-                            appInfo.label.c_str(), pid);
-                }
-            }
-        } break;
-
-        case WORK_MODE::V1: {
-            for (const int pid : appInfo.pids) {
-                if (!Utils::writeInt(freeze ? cgroupV1FrozenPath : cgroupV1UnfrozenPath, pid))
-                    freezeit.logFmt("%s [%s] 失败(V1) PID:%d",
                         freeze ? "冻结" : "解冻", appInfo.label.c_str(), pid);
             }
         } break;
@@ -398,7 +338,7 @@ public:
         case FREEZE_MODE::FREEZER_BREAK: {
             if (workMode != WORK_MODE::GLOBAL_SIGSTOP) {
                 const int res = handleBinder(appInfo, freeze);
-                if (res < 0 && freeze && appInfo.isTolerant)
+                if (res < 0 && freeze && appInfo.isPermissive)
                     return res;
                 handleFreezer(appInfo, freeze);
                 break;
@@ -409,7 +349,7 @@ public:
         case FREEZE_MODE::SIGNAL:
         case FREEZE_MODE::SIGNAL_BREAK: {
             const int res = handleBinder(appInfo, freeze);
-            if (res < 0 && freeze && appInfo.isTolerant)
+            if (res < 0 && freeze && appInfo.isPermissive)
                 return res;
             handleSignal(appInfo, freeze ? SIGSTOP : SIGCONT);
         } break;
@@ -420,14 +360,14 @@ public:
             return 0;
         }
 
-        default: {
-            freezeit.logFmt("不再冻结此应用：%s %s", appInfo.label.c_str(),
-                getModeText(appInfo.freezeMode).c_str());
+        default: { // 刚刚切到白名单，但仍在 pendingHandleList 时，就会执行到这里
+            //freezeit.logFmt("不再冻结此应用：%s %s", appInfo.label.c_str(),
+            //    getModeText(appInfo.freezeMode).c_str());
             return 0;
         }
         }
 
-        if (settings.wakeupTimeoutMin != 120) {
+        if (settings.isWakeupEnable()) {
             // 无论冻结还是解冻都要清除 解冻时间线上已设置的uid
             auto it = unfrozenIdx.find(appInfo.uid);
             if (it != unfrozenIdx.end())
@@ -435,7 +375,7 @@ public:
 
             // 冻结就需要在 解冻时间线 插入下一次解冻的时间
             if (freeze && appInfo.pids.size() && appInfo.isSignalOrFreezer()) {
-                uint32_t nextIdx = (timelineIdx + settings.wakeupTimeoutMin * 60) & 0x0FFF; // [ %4096]
+                uint32_t nextIdx = (timelineIdx + settings.getWakeupTimeout()) & 0x0FFF; // [ %4096]
                 unfrozenIdx[appInfo.uid] = nextIdx;
                 unfrozenTimeline[nextIdx] = appInfo.uid;
             }
@@ -468,8 +408,9 @@ public:
     void checkReFreeze() {
         START_TIME_COUNT;
 
-        if (--refreezeSecRemain > 0) return;
+        if (!settings.isRefreezeEnable()) return;
 
+        if (--refreezeSecRemain > 0) return;
         refreezeSecRemain = settings.getRefreezeTimeout();
 
         lock_guard<mutex> lock(naughtyMutex);
@@ -510,7 +451,10 @@ public:
                 strcat(fullPath + 8, "/cmdline");
                 char readBuff[256];
                 if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
-                if (strncmp(readBuff, appInfo.package.c_str(), appInfo.package.length())) continue;
+                const auto& package = appInfo.package;
+                if (strncmp(readBuff, package.c_str(), package.length())) continue;
+                const char endChar = readBuff[package.length()]; // 特例 com.android.chrome_zygote 无法binder冻结
+                if (endChar != ':' && endChar != 0)continue;
 
                 memcpy(fullPath + 6, file->d_name, 6);
                 strcat(fullPath + 8, "/wchan");
@@ -530,7 +474,7 @@ public:
         }
         if (naughtyApp.size()) {
             naughtyApp.clear();
-            freezeit.log(tmp.c_str());
+            freezeit.log(string_view(tmp.c_str(), tmp.length));
         }
         else {
             freezeit.log("定时压制 目前均处于冻结状态");
@@ -647,7 +591,10 @@ public:
             strcat(fullPath + 8, "/cmdline");
             char readBuff[256]; // now is cmdline Content
             if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
-            if (strncmp(readBuff, appInfo.package.c_str(), appInfo.package.length())) continue;
+            const auto& package = appInfo.package;
+            if (strncmp(readBuff, package.c_str(), package.length())) continue;
+            const char endChar = readBuff[package.length()]; // 特例 com.android.chrome_zygote 无法binder冻结
+            if (endChar != ':' && endChar != 0)continue;
 
             uidSet.insert(uid);
             pidSet.insert(pid);
@@ -671,7 +618,11 @@ public:
             }
 
             if (pendingHandleList.contains(uid)) {
-                stateStr.appendFmt("%5d %4d ⏳%d秒后冻结 %s\n", pid, memMiB, pendingHandleList[uid], label.c_str());
+                const auto secRemain = pendingHandleList[uid];
+                if (secRemain < 60)
+                    stateStr.appendFmt("%5d %4d ⏳%d秒后冻结 %s\n", pid, memMiB, secRemain, label.c_str());
+                else
+                    stateStr.appendFmt("%5d %4d ⏳%d分后冻结 %s\n", pid, memMiB, secRemain / 60, label.c_str());
                 continue;
             }
 
@@ -733,16 +684,15 @@ public:
             stateStr.appendFmt("%.2f GiB", totalMiB / 1024.0);
             if (getSignalCnt)
                 stateStr.append(", V2*带星号状态为get_signal，小概率非冻结状态");
-            if (isV1Mode())
-                stateStr.append(", V1已冻结状态可能会识别为[运行中]，请到[CPU使用时长]页面查看是否跳动", 98);
 
-            freezeit.log(stateStr.c_str());
+            freezeit.log(string_view(stateStr.c_str(), stateStr.length));
         }
         END_TIME_COUNT;
     }
 
     // 解冻新APP, 旧APP加入待冻结列队 call once per 0.5 sec when Touching
     void updateAppProcess() {
+        bool isupdate = false;
         vector<int> newShowOnApp, toBackgroundApp;
 
         for (const int uid : curForegroundApp)
@@ -760,8 +710,10 @@ public:
 
         for (const int uid : newShowOnApp) {
             // 如果在待冻结列表则只需移除
-            if (pendingHandleList.erase(uid))
+            if (pendingHandleList.erase(uid)) {
+                isupdate = true;
                 continue;
+            }
 
             // 更新[打开时间]  并解冻
             auto& appInfo = managedApp[uid];
@@ -772,13 +724,20 @@ public:
             else freezeit.logFmt("😁打开 %s", appInfo.label.c_str());
         }
 
-        for (const int uid : toBackgroundApp) // 更新倒计时
-            pendingHandleList[uid] = managedApp[uid].isTerminateMode() ? 
-            settings.terminateTimeout : settings.freezeTimeout;
+        for (const int uid : toBackgroundApp) { // 更新倒计时
+            isupdate = true;
+            pendingHandleList[uid] = managedApp[uid].isTerminateMode() ?
+                settings.terminateTimeout : settings.freezeTimeout;
+        }
+
+        if (isupdate)
+            updatePendingByLocalSocket();
     }
 
     // 处理待冻结列队 call once per 1sec
     void processPendingApp() {
+        bool isupdate = false;
+
         auto it = pendingHandleList.begin();
         while (it != pendingHandleList.end()) {
             auto& remainSec = it->second;
@@ -791,17 +750,24 @@ public:
             auto& appInfo = managedApp[uid];
             const int num = handleProcess(appInfo, true);
             if (num < 0) {
-                remainSec = 15 << (++appInfo.failFreezeCnt);
-                freezeit.logFmt("%s:%d Binder正在传输, 延迟 %d%s 再冻结", appInfo.label.c_str(), -num,
-                    remainSec < 60 ? remainSec : remainSec / 60, remainSec < 60 ? "秒" : "分");
-                it++;
-                continue;
+                if (appInfo.delayCnt >= 8) { // TODO
+                    handleSignal(appInfo, SIGKILL);
+                    freezeit.logFmt("%s:%d 已延迟%d次, 强制杀死", appInfo.label.c_str(), -num, appInfo.delayCnt);
+                }
+                else {
+                    appInfo.delayCnt++;
+                    remainSec = 15 << appInfo.delayCnt;
+                    freezeit.logFmt("%s:%d Binder正在传输, 第%d次延迟, %d%s 后再冻结", appInfo.label.c_str(), -num,
+                        appInfo.delayCnt, remainSec < 60 ? remainSec : remainSec / 60, remainSec < 60 ? "秒" : "分");
+                    it++;
+                    continue;
+                }
             }
             it = pendingHandleList.erase(it);
-            appInfo.failFreezeCnt = 0;
+            appInfo.delayCnt = 0;
 
             appInfo.stopTimestamp = time(nullptr);
-            const int delta = appInfo.startTimestamp == 0 ? 0:
+            const int delta = appInfo.startTimestamp == 0 ? 0 :
                 (appInfo.stopTimestamp - appInfo.startTimestamp);
             appInfo.startTimestamp = appInfo.stopTimestamp;
             appInfo.totalRunningTime += delta;
@@ -826,7 +792,48 @@ public:
                     appInfo.isSignalMode() ? "🧊" : "❄️",
                     appInfo.label.c_str(), num, timeStr.c_str());
             else freezeit.logFmt("😭关闭 %s %s", appInfo.label.c_str(), *timeStr);
+
+            isupdate = true;
         }
+
+        if (isupdate)
+            updatePendingByLocalSocket();
+
+    }
+
+
+    void updatePendingByLocalSocket() {
+        START_TIME_COUNT;
+
+        int buff[64];
+        int uidCnt = 0;
+        for (const auto& [uid, remainSec] : pendingHandleList) {
+            buff[uidCnt++] = uid;
+            if (uidCnt > 60)
+                break;
+        }
+
+        const int recvLen = Utils::localSocketRequest(XPOSED_CMD::UPDATE_PENDING, buff,
+            uidCnt * sizeof(int), buff, sizeof(buff));
+
+        if (recvLen == 0) {
+            freezeit.logFmt("%s() 工作异常, 请确认LSPosed中冻它勾选系统框架, 然后重启", __FUNCTION__);
+            END_TIME_COUNT;
+            return;
+        }
+        else if (recvLen != 4) {
+            freezeit.logFmt("%s() 返回数据异常 recvLen[%d]", __FUNCTION__, recvLen);
+            if (recvLen > 0 && recvLen < 64 * 4)
+                freezeit.logFmt("DumpHex: %s", Utils::bin2Hex(buff, recvLen).c_str());
+            END_TIME_COUNT;
+            return;
+        }
+        else if (static_cast<REPLY>(buff[0]) == REPLY::FAILURE) {
+            freezeit.log("Pending更新失败");
+        }
+        freezeit.debugFmt("pending更新 %d", uidCnt);
+        END_TIME_COUNT;
+        return;
     }
 
     void checkWakeup() {
@@ -899,131 +906,6 @@ public:
         if (curForegroundApp.size() >= (lastForegroundApp.size() + 3)) //有时系统会虚报大量前台应用
             curForegroundApp = lastForegroundApp;
 
-        END_TIME_COUNT;
-    }
-
-    // 常规查询前台 只返回第三方, 剔除白名单/桌面
-    void getVisibleAppByShellLRU(set<int>& cur) {
-        START_TIME_COUNT;
-
-        cur.clear();
-        const char* cmdList[] = { "/system/bin/dumpsys", "dumpsys", "activity", "lru", nullptr };
-        VPOPEN::vpopen(cmdList[0], cmdList + 1, getVisibleAppBuff.get(), GET_VISIBLE_BUF_SIZE);
-
-        stringstream ss;
-        ss << getVisibleAppBuff.get();
-
-        // 以下耗时仅 0.08-0.14ms, VPOPEN::vpopen 15-60ms
-        string line;
-        getline(ss, line);
-
-        bool isHook = strncmp(line.c_str(), "JARK006_LRU", 4) == 0;
-        /*
-      Hook
-      OnePlus6:/ # dumpsys activity lru
-      JARK006_LRU
-      10XXX 2
-      10XXX 3
-      */
-        if (isHook) {
-            while (getline(ss, line)) {
-                if (strncmp(line.c_str(), "10", 2))continue;
-
-                int uid, level;
-                sscanf(line.c_str(), "%d %d", &uid, &level);
-                if (level < 2 || 6 < level) continue;
-
-                if (!managedApp.contains(uid))continue;
-                if (managedApp[uid].isWhitelist())continue;
-                if ((level <= 3) || managedApp[uid].isTolerant) cur.insert(uid);
-#if DEBUG_DURATION
-                freezeit.logFmt("Hook前台 %s:%d", managedApp[uid].label.c_str(), level);
-#endif
-            }
-        }
-        else if (freezeit.SDK_INT_VER >= 29) { //Android 11 Android 12+
-
-            /* SDK 31-32-33
-            OnePlus6:/ # dumpsys activity lru
-            ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
-              Activities:
-              #45: cch+ 5 CEM  ---- 5537:com.tencent.mobileqq/u0a212
-              Other:
-              #39: svcb   SVC  ---- 19270:com.tencent.mm/u0a221
-
-            generic_x86_64:/ $ getprop ro.build.version.sdk
-            30
-            generic_x86_64:/ $ dumpsys activity lru
-            ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
-              Activities:
-              #30: fg     TOP  LCM 995:com.android.launcher3/u0a117 act:activities|recents
-              Other:
-              #29: cch+ 5 CEM  --- 801:com.android.permissioncontroller/u0a127
-              # 6: pers   PER  LCM 1354:com.android.ims.rcsservice/1001
-              # 5: psvc   PER  LCM 670:com.android.bluetooth/1002
-
-            !!! !!! !!!
-
-            generic_x86_64:/ $ getprop ro.build.version.sdk
-            29
-            generic_x86_64:/ # dumpsys activity lru
-            ACTIVITY MANAGER LRU PROCESSES (dumpsys activity lru)
-              Activities:
-                #26: fore   TOP  2961:com.android.launcher3/u0a100  activity=activities|recents
-              Other:
-                #25: cch+ 5 CEM  3433:com.android.dialer/u0a101
-                #24: prev   LAST 3349:android.process.acore/u0a52
-                #23: cch+ 5 CEM  4100:com.android.keychain/1000
-                #9: cch+75 CEM  3551:com.android.managedprovisioning/u0a59
-                #8: prcp   IMPB 2601:com.android.inputmethod.latin/u0a115
-            */
-            auto getForegroundLevel = [](const char* ptr) {
-                // const char level[][8] = {
-                // // 0, 1,   2顶层,   3, 4常驻状态栏, 5, 6悬浮窗
-                // "PER ", "PERU", "TOP ", "BTOP", "FGS ", "BFGS", "IMPF",
-                // };
-                // for (int i = 2; i < sizeof(level) / sizeof(level[0]); i++) {
-                //   if (!strncmp(ptr, level[i], 4))
-                //     return i;
-                // }
-
-                constexpr uint32_t levelInt[7] = { 0x20524550, 0x55524550, 0x20504f54, 0x504f5442,
-                                                  0x20534746, 0x53474642, 0x46504d49 };
-                const uint32_t target = *((uint32_t*)ptr);
-                for (int i = 2; i < 7; i++) {
-                    if (target == levelInt[i])
-                        return i;
-                }
-                return 16;
-            };
-
-            int offset = freezeit.SDK_INT_VER == 29 ? 5 : 3; // 行首 空格加#号 数量
-            auto startStr = freezeit.SDK_INT_VER == 29 ? "    #" : "  #";
-            getline(ss, line);
-            if (!strncmp(line.c_str(), "  Activities:", 4)) {
-                while (getline(ss, line)) {
-                    // 此后每行必需以 "  #"、"    #" 开头，否则就是 Service: Other:需跳过
-                    if (strncmp(line.c_str(), startStr, offset)) break;
-
-                    auto linePtr = line.c_str() + offset; // 偏移已经到数字了
-
-                    auto ptr = linePtr + (linePtr[2] == ':' ? 11 : 12); //11: # 1 ~ 99   12: #100+
-                    int level = getForegroundLevel(ptr);
-                    if (level < 2 || 6 < level) continue;
-
-                    ptr = strstr(line.c_str(), "/u0a");
-                    if (!ptr)continue;
-                    int uid = 10000 + atoi(ptr + 4);
-                    if (!managedApp.contains(uid))continue;
-                    if (managedApp[uid].isWhitelist())continue;
-                    if ((level <= 3) || managedApp[uid].isTolerant) cur.insert(uid);
-
-#if DEBUG_DURATION
-                    freezeit.logFmt("Legacy前台 %s:%d", managedApp[uid].label.c_str(), level);
-#endif
-                }
-            }
-        }
         END_TIME_COUNT;
     }
 
@@ -1130,21 +1012,23 @@ public:
 
         int inotifyFd = inotify_init();
         if (inotifyFd < 0) {
-            fprintf(stderr, "同步事件: 0xB0 (1/3)失败: [%d]:[%s]", errno, strerror(errno));
+            fprintf(stderr, "同步事件: 0xB1 (1/3)失败: [%d]:[%s]", errno, strerror(errno));
             exit(-1);
         }
 
-        int watch_d = inotify_add_watch(inotifyFd,
-            freezeit.SDK_INT_VER >= 33 ? cpusetEventPathA13
-            : cpusetEventPathA12,
-            IN_ALL_EVENTS);
+        //int watch_d = inotify_add_watch(inotifyFd,
+        //    systemTools.SDK_INT_VER >= 33 ? cpusetEventPathA13
+        //    : cpusetEventPathA12,
+        //    IN_ALL_EVENTS);
+
+        int watch_d = inotify_add_watch(inotifyFd, cpusetEventPath, IN_ALL_EVENTS);
 
         if (watch_d < 0) {
-            fprintf(stderr, "同步事件: 0xB0 (2/3)失败: [%d]:[%s]", errno, strerror(errno));
+            fprintf(stderr, "同步事件: 0xB1 (2/3)失败: [%d]:[%s]", errno, strerror(errno));
             exit(-1);
         }
 
-        freezeit.log("初始化同步事件: 0xB0");
+        freezeit.log("初始化同步事件: 0xB1");
 
         constexpr int REMAIN_TIMES_MAX = 2;
         char buf[TRIGGER_BUF_SIZE];
@@ -1173,17 +1057,13 @@ public:
                 START_TIME_COUNT;
                 if (doze.isScreenOffStandby) {
                     if (doze.checkIfNeedToExit()) {
-                        curForegroundApp = move(curFgBackup); // recovery
+                        curForegroundApp = std::move(curFgBackup); // recovery
                         updateAppProcess();
-                        setWakeupLockByLocalSocket(WAKEUP_LOCK::DEFAULT);
+                        //setWakeupLockByLocalSocket(WAKEUP_LOCK::DEFAULT);//TODO xposed端改为一律禁止
                     }
                 }
                 else {
-#ifdef __x86_64__
-                    getVisibleAppByShellLRU(curForegroundApp);
-#else
                     getVisibleAppByLocalSocket();
-#endif
                     updateAppProcess(); // ~40us
                 }
                 END_TIME_COUNT;
@@ -1197,9 +1077,9 @@ public:
 
             // 2分钟一次 在亮屏状态检测是否已经息屏  息屏状态则检测是否再次强制进入深度Doze
             if (doze.checkIfNeedToEnter()) {
-                curFgBackup = move(curForegroundApp); //backup
+                curFgBackup = std::move(curForegroundApp); //backup
                 updateAppProcess();
-                setWakeupLockByLocalSocket(WAKEUP_LOCK::IGNORE);
+                //setWakeupLockByLocalSocket(WAKEUP_LOCK::IGNORE); //TODO xposed端改为一律禁止
             }
 
             if (doze.isScreenOffStandby)continue;// 息屏状态 不用执行 以下功能
@@ -1249,6 +1129,8 @@ public:
             if (Utils::readString(fullPath, readBuff, sizeof(readBuff)) == 0)continue;
             const auto& package = managedApp[uid].package;
             if (strncmp(readBuff, package.c_str(), package.length())) continue;
+            const char endChar = readBuff[package.length()]; // 特例 com.android.chrome_zygote 无法binder冻结
+            if (endChar != ':' && endChar != 0)continue;
 
             uids.insert(uid);
         }
@@ -1295,19 +1177,18 @@ public:
     // https://cs.android.com/android/kernel/superproject/+/common-android-mainline:common/drivers/android/binder.c;l=5615
     // https://elixir.bootlin.com/linux/latest/source/drivers/android/binder.c#L5412
 
-    // return 0成功  小于0为操作失败的pid
-    int handleBinder(const appInfoStruct& appInfo, const bool freeze) {
+    // 0成功  小于0为操作失败的pid
+    int handleBinder(appInfoStruct& appInfo, const bool freeze) {
         if (bs.fd <= 0)return 0;
 
         START_TIME_COUNT;
 
         // https://cs.android.com/android/kernel/superproject/+/common-android-mainline:common/drivers/android/binder.c;l=5434
         // 100ms 等待传输事务完成
-        binder_freeze_info binderInfo{ 0, static_cast<uint32_t>(freeze ? 1 : 0), 100 };
+        binder_freeze_info binderInfo{ 0u, freeze ? 1u : 0u, 100u };
         binder_frozen_status_info statusInfo = { 0, 0, 0 };
 
         if (freeze) { // 冻结
-            binderInfo.enable = 1;
             for (size_t i = 0; i < appInfo.pids.size(); i++) {
                 binderInfo.pid = appInfo.pids[i];
                 if (ioctl(bs.fd, BINDER_FREEZE, &binderInfo) < 0) {
@@ -1341,12 +1222,12 @@ public:
                     int errorCode = errno;
                     freezeit.logFmt("获取 [%s:%d] Binder 状态错误 ErrroCode:%d", appInfo.label.c_str(), statusInfo.pid, errorCode);
                 }
-                else if (statusInfo.sync_recv & 2) { // 冻结后发现仍有传输事务
+                else if (statusInfo.sync_recv & 0b0010) { // 冻结后发现仍有传输事务
                     freezeit.logFmt("%s 仍有Binder传输事务", appInfo.label.c_str());
 
-                    // 解冻已经被冻结binder的进程
+                    // 解冻全部进程
                     binderInfo.enable = 0;
-                    for (size_t j = 0; j < i; j++) {
+                    for (size_t j = 0; j < appInfo.pids.size(); j++) {
                         binderInfo.pid = appInfo.pids[j];
 
                         //TODO 如果解冻失败？
@@ -1357,10 +1238,11 @@ public:
                     }
                     return -appInfo.pids[i];
                 }
-
             }
         }
         else { // 解冻
+            set<int> hasSync;
+
             for (size_t i = 0; i < appInfo.pids.size(); i++) {
                 statusInfo.pid = appInfo.pids[i];
                 if (ioctl(bs.fd, BINDER_GET_FROZEN_INFO, &statusInfo) < 0) {
@@ -1372,19 +1254,33 @@ public:
                     // https://cs.android.com/android/platform/superproject/main/+/main:frameworks/base/services/core/jni/com_android_server_am_CachedAppOptimizer.cpp;l=489
                     // https://cs.android.com/android/kernel/superproject/+/common-android-mainline:common/drivers/android/binder.c;l=5467
                     if (statusInfo.sync_recv & 1) {
-                        freezeit.logFmt("%s 冻结期间存在 同步传输 Sync transactions, 考虑杀掉进程", appInfo.label.c_str());
+                        freezeit.debugFmt("[%s:%d] 冻结期间存在 同步传输 Sync transactions, 杀掉进程", appInfo.label.c_str(), statusInfo.pid);
                         //TODO 要杀掉进程
+                        hasSync.insert(statusInfo.pid);
                     }
                     if (statusInfo.async_recv & 1) {
-                        freezeit.logFmt("%s 冻结期间存在 异步传输（不重要）", appInfo.label.c_str());
+                        freezeit.debugFmt("[%s:%d] 冻结期间存在 异步传输（不重要）", appInfo.label.c_str(), statusInfo.pid);
                     }
-                    if (statusInfo.sync_recv & 2) {
-                        freezeit.logFmt("%s 冻结期间存在“未完成”传输（不重要）TXNS_PENDING", appInfo.label.c_str());
+                    if (statusInfo.sync_recv & 0b0010) {
+                        freezeit.debugFmt("[%s:%d] 冻结期间存在“未完成”传输（不重要）TXNS_PENDING", appInfo.label.c_str(), statusInfo.pid);
                     }
                 }
             }
 
-            binderInfo.enable = 0;
+
+            if (hasSync.size()) {
+                for (auto it = appInfo.pids.begin(); it != appInfo.pids.end();) {
+                    if (hasSync.contains(*it)) {
+                        freezeit.debugFmt("杀掉进程 pid: %d", *it);
+                        kill(*it, SIGKILL);
+                        it = appInfo.pids.erase(it);
+                    }
+                    else {
+                        it++;
+                    }
+                }
+            }
+
             for (size_t i = 0; i < appInfo.pids.size(); i++) {
                 binderInfo.pid = appInfo.pids[i];
                 if (ioctl(bs.fd, BINDER_FREEZE, &binderInfo) < 0) {
@@ -1395,7 +1291,7 @@ public:
                     snprintf(tmp, sizeof(tmp), "/proc/%d", binderInfo.pid);
 
                     if (access(tmp, F_OK)) {
-                        freezeit.logFmt("进程已不在 [%s] %u", appInfo.label.c_str(), binderInfo.pid);
+                        freezeit.logFmt("进程已不在 [%s:%u] ", appInfo.label.c_str(), binderInfo.pid);
                     }
                     //TODO 再解冻一次，若失败，考虑杀死？
                     else if (ioctl(bs.fd, BINDER_FREEZE, &binderInfo) < 0) {
@@ -1417,12 +1313,6 @@ public:
     }
 
     void binderInit(const char* driver) {
-        if (freezeit.kernelVersion.main <= 4) { // 4.xx 内核不支持
-            freezeit.logFmt("内核版本低(%d.%d.%d)，不支持 BINDER_FREEZER 特性", 
-                freezeit.kernelVersion.main, freezeit.kernelVersion.sub, freezeit.kernelVersion.patch);
-            return;
-        }
-
         bs.fd = open(driver, O_RDWR | O_CLOEXEC);
         if (bs.fd < 0) {
             freezeit.logFmt("Binder初始化失败 路径打开失败：[%s] [%d:%s]", driver, errno, strerror(errno));
@@ -1462,6 +1352,5 @@ public:
             bs.fd = -1;
             return;
         }
-    }
-    
+    }    
 };
