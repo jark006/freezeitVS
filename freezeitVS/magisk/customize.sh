@@ -114,10 +114,13 @@ else
     fi
 fi
 
-# 仅限 MIUI 12~15
+# 仅限 MIUI 12~14, HyperOS 1~6
 MIUI_VersionCode=$(getprop ro.miui.ui.version.code)
-if [ "$MIUI_VersionCode" -ge 12 ] && [ "$MIUI_VersionCode" -le 15 ]; then
-    echo "- 已配置禁用Millet参数"
+HyperOS_VersionCode=$(getprop ro.mi.os.version.code)
+if [ "$MIUI_VersionCode" -ge 12 ] && [ "$MIUI_VersionCode" -le 14 ]; then
+    echo "- 已配置禁用Millet参数  MIUI $MIUI_VersionCode"
+elif [ "$HyperOS_VersionCode" -ge 1 ] && [ "$HyperOS_VersionCode" -le 6 ]; then
+    echo "- 已配置禁用Millet参数  HyperOS $HyperOS_VersionCode"
 else
     rm "$MODPATH"/system.prop
 fi

@@ -17,7 +17,7 @@ private:
             10, //[2] freezeTimeout sec
             4,  //[3] wakeupTimeoutIdx 固定选项
             20, //[4] terminateTimeout sec
-            0,  //[5] setMode
+            2,  //[5] setMode 设置Freezer模式  0: v2frozen, 1: v2uid, 2: 全局SIGSTOP(默认)
             2,  //[6] refreezeTimeoutIdx 固定选项
             0,  //[7]
             0,  //[8]
@@ -75,7 +75,7 @@ public:
     uint8_t& enableDoze = settingsVar[17];             // 深度Doze
     //uint8_t& unknown = settingsVar[18];                // 
 
-    uint8_t& enableDebug = settingsVar[30];        // Doze调试日志
+    uint8_t& enableDebug = settingsVar[30];        // 调试日志
 
     Settings& operator=(Settings&&) = delete;
 
@@ -158,17 +158,17 @@ public:
         return SETTINGS_SIZE;
     }
 
-    bool isRefreezeEnable() {
+    bool isRefreezeEnable() const {
         return refreezeTimeoutIdx > 0 && refreezeTimeoutIdx < (sizeof(refreezeTimeoutList) / sizeof(refreezeTimeoutList[0]));
     }
-    int getRefreezeTimeout() {
+    int getRefreezeTimeout() const {
         return refreezeTimeoutList[refreezeTimeoutIdx < (sizeof(refreezeTimeoutList) / sizeof(refreezeTimeoutList[0])) ? refreezeTimeoutIdx : 0];
     }
 
-    bool isWakeupEnable() {
+    bool isWakeupEnable() const {
         return wakeupTimeoutIdx > 0 && wakeupTimeoutIdx < (sizeof(wakeupTimeoutList) / sizeof(wakeupTimeoutList[0]));
     }
-    int getWakeupTimeout() {
+    int getWakeupTimeout() const {
         return wakeupTimeoutList[wakeupTimeoutIdx < (sizeof(wakeupTimeoutList) / sizeof(wakeupTimeoutList[0])) ? wakeupTimeoutIdx : 0];
     }
 
@@ -255,7 +255,6 @@ public:
 
         settingsVar[idx] = val;
         if (save()) {
-            freezeit.log("⚙️设置成功");
             return snprintf(replyBuf, REPLY_BUF_SIZE, "success");
         }
         else {
