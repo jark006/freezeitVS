@@ -187,13 +187,7 @@ public:
             const int activeRate = deltaTime <= 0 ? 0 :
                 (100 * (systemTools.cycleCnt - enterDozeCycleStamp) / deltaTime); //CPU 活跃率
 
-            if (deltaTime < 300) {
-                if (deltaTime >= 60)
-                    freezeit.logFmt("退出Doze 小睡了 %d分%d秒", deltaTime / 60, deltaTime % 60);
-                else
-                    freezeit.logFmt("退出Doze 小睡了 %d秒", deltaTime % 60);
-            }
-            else {
+            if (deltaTime >= 300) {
                 stackString<1024 * 16> tmp;
 
                 if (activeRate <= 85)
@@ -281,7 +275,6 @@ public:
             updateDozeWhitelist();
             updateUidTime();
 
-            freezeit.log("😴 进入深度Doze");
             enterDozeTimeStamp = nowTimeStamp;
             enterDozeCycleStamp = systemTools.cycleCnt;
 

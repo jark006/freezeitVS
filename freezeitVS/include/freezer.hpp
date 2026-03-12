@@ -1189,8 +1189,24 @@ public:
         struct sockaddr_nl saddr {}, daddr{};
         auto umsg = "Hello! Re:Kernel!";
 
-        if (access("/proc/rekernel/22", F_OK)) {
-            freezeit.log("ReKernel未安装: /proc/rekernel/22");
+        DIR* dir = opendir("/proc/rekernel");
+        if (dir == nullptr) {
+            freezeit.log("ReKernel未安装: /proc/rekernel");
+            return;
+        }
+
+        auto file = readdir(dir);
+        if (file == nullptr) {
+            freezeit.log("ReKernel未安装: [ /proc/rekernel ] is empty");
+            closedir(dir);
+            return;
+        }
+
+        const int rekernelPort = atoi(file->d_name);
+        closedir(dir);
+
+        if (rekernelPort <= 0 || rekernelPort >= 65536) {
+            freezeit.logFmt("ReKernelPort端口错误: [%d] [%s]", rekernelPort, file->d_name);
             return;
         }
 
@@ -1205,7 +1221,7 @@ public:
                 break;
             }
 
-            skfd = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_TEST);
+            skfd = socket(AF_NETLINK, SOCK_DGRAM, rekernelPort);
             if (skfd == -1) {
                 freezeit.log("ReKernel AF_NETLINK 创建失败");
                 sleep(60);
